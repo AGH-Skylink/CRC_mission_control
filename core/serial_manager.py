@@ -15,24 +15,18 @@ class SerialManager:
         self.ser = None
         self.is_running = False
         self.read_thread = None
-        self.raw_queue = queue.Queue()  # Kolejka surowych linii dla parsera
+        self.raw_queue = queue.Queue()
         self.status = ConnectionStatus.DISCONNECTED
         self.logger = logging.getLogger("MissionControl")
 
-        # Statystyki wydajności dla UI
         self.bitrate = 0.0
         self._bytes_count = 0
         self._last_stat_time = time.time()
 
     def scan_ports(self):
-        """Zwraca listę portów, uwzględniając wirtualne porty na macOS."""
-        # Standardowe skanowanie sprzętowe
         ports = [port.device for port in serial.tools.list_ports.comports()]
 
-        # Dodatek dla macOS: szukanie portów stworzonych przez socat
         if sys.platform.startswith('darwin'):
-            # Szukamy wzorca /dev/ttys* (standard dla PTY na Macu)
-            # Możesz też dodać /dev/cu.* jeśli socat takowe stworzy
             virtual_ptys = glob.glob('/dev/ttys[0-9][0-9][0-9]')
             for p in virtual_ptys:
                 if p not in ports:
@@ -42,23 +36,21 @@ class SerialManager:
         return ports
 
     def connect(self, port, baudrate=115200):
-        """Inicjalizuje połączenie z STM32/LoRa."""
-        self.logger.info(f"Attempting to connect to {port} at {baudrate} baud...")  # <--- LOG INFO
+        self.logger.info(f"Attempting to connect to {port} at {baudrate} baud...")
         try:
             self.ser = serial.Serial(port, baudrate, timeout=0.1)
             self.is_running = True
             self.read_thread = threading.Thread(target=self._read_loop, daemon=True)
             self.read_thread.start()
             self.status = ConnectionStatus.CONNECTED
-            self.logger.info(f"Successfully connected to {port}")  # <--- LOG INFO[cite: 3, 4, 24]
+            self.logger.info(f"Successfully connected to {port}")
             return True
         except Exception as e:
-            self.logger.error(f"Failed to connect to {port}: {e}")  # <--- LOG ERROR[cite: 4, 24]
+            self.logger.error(f"Failed to connect to {port}: {e}")
             self.status = ConnectionStatus.ERROR
             return False
 
     def disconnect(self):
-        """Zatrzymuje wątek i bezpiecznie zamyka port."""
         if not self.is_running:
             return
 
@@ -67,34 +59,36 @@ class SerialManager:
             self.read_thread.join(timeout=1.0)
         if self.ser and self.ser.is_open:
             self.ser.close()
-            self.logger.warning("Serial connection closed by user")  # <--- LOG WARNING[cite: 4, 24]
+            self.logger.warning("Serial connection closed by user")
         self.status = ConnectionStatus.DISCONNECTED
 
     def _read_loop(self):
-        """Wątek w tle odciążający GUI od operacji I/O[cite: 3]."""
+        sync_buffer = bytearray()
+
         while self.is_running:
             if self.ser and self.ser.is_open:
                 try:
                     if self.ser.in_waiting > 0:
-                        line = self.ser.readline()
-                        self._bytes_count += len(line)
+                        chunk = self.ser.read(self.ser.in_waiting)
+                        self._bytes_count += len(chunk)
+                        sync_buffer.extend(chunk)
 
-                        # Próba dekodowania (ignorowanie błędnych bajtów LoRa)
-                        decoded_line = line.decode('utf-8', errors='ignore').strip()
-                        if decoded_line:
-                            self.raw_queue.put(decoded_line)
+                        while len(sync_buffer) >= 58:
+                            if sync_buffer[55:58] == b'\n\r\0':
+                                frame_bytes = sync_buffer[:58]
+                                self.raw_queue.put(frame_bytes)
+                                sync_buffer = sync_buffer[58:]
+                            else:
+                                sync_buffer.pop(0)
 
-                    # Obliczanie bitrate co 1 sekundę
                     self._update_bitrate()
-
-                except Exception:
+                except Exception as e:
                     self.logger.critical(f"Serial read error: {e}")
                     self.status = ConnectionStatus.ERROR
                     self.is_running = False
-            time.sleep(0.001)  # Minimalne opóźnienie dla zachowania responsywności CPU
+            time.sleep(0.001)
 
     def _update_bitrate(self):
-        """Oblicza aktualną prędkość transmisji w kb/s."""
         now = time.time()
         diff = now - self._last_stat_time
         if diff >= 1.0:
@@ -103,13 +97,12 @@ class SerialManager:
             self._last_stat_time = now
 
     def send_data(self, data):
-        """Wysyła komendy do rakiety."""
         if self.ser and self.ser.is_open:
             try:
                 self.ser.write(f"{data}\n".encode())
-                self.logger.debug(f"Raw data sent: {data}")  # <--- LOG DEBUG[cite: 4, 24]
+                self.logger.debug(f"Raw data sent: {data}")
                 return True
             except Exception as e:
-                self.logger.error(f"Failed to send data '{data}': {e}")  # <--- LOG ERROR[cite: 4, 24]
+                self.logger.error(f"Failed to send data '{data}': {e}")
                 self.status = ConnectionStatus.ERROR
         return False

@@ -1,113 +1,99 @@
+import struct
+import math
 import time
 import logging
 from typing import Optional
 from core.data_types import TelemetryFrame, MissionState, ConnectionStatus, Vector3
-from datetime import datetime
 
 class TelemetryParser:
+    # C Struct unpacking format dla 58 bajtów:
+    # <  - Little Endian (standard dla STM32)
+    # B  - 1x uint8 (preambula)
+    # I  - 1x uint32 (timestamp)
+    # B, B - 2x uint8 (stan, ost. komenda)
+    # h, h - 2x int16 (wysokość dm, temperatura)
+    # 9h - 9x int16 (3x mag, 3x acc, 3x gyro)
+    # 20s - 20 bajtów char (GPS - obecnie śmieci)
+    # B  - 1x uint8 (GPIO)
+    # H  - 1x uint16 (napięcie)
+    # b  - 1x int8 (RSSI)
+    # H  - 1x uint16 (CRC)
+    # 3s - 3 bajty zakonczenia
+    FRAME_FORMAT = "< B I B B h h h h h h h h h h h 20s B H b H 3s"
+    FRAME_SIZE = 58
+
     def __init__(self):
-        """Inicjalizacja parsera z czystym stanem i loggerem systemowym."""
         self.state = TelemetryFrame()
-        self._last_frame_id = -1
         self._last_valid_time = 0.0
         self.logger = logging.getLogger("MissionControl")
         self._prev_mission_state = MissionState.IDLE
         self._prev_conn_status = ConnectionStatus.DISCONNECTED
         self._last_drop_time = 0
 
-    def parse_line(self, line: str) -> Optional[TelemetryFrame]:
-        """
-        Parsuje linię CSV z STM32 i zarządza logiką diagnostyczną.
-        Format ramki: ID;STATE;ACC_X;ACC_Y;ACC_Z;GYR_X;GYR_Y;GYR_Z;MAG_X;MAG_Y;MAG_Z;ALT;LAT;LON;TEMP;VOLT;CURR;STRAIN;P;R;Y
-        """
+    def parse_frame(self, frame_bytes: bytes) -> Optional[TelemetryFrame]:
+        if len(frame_bytes) != self.FRAME_SIZE:
+            return None
+
         try:
-            parts = line.split(';')
-            # Minimalna liczba elementów (bazując na raporcie avioniki[cite: 1])
-            if len(parts) < 15 or not parts[0].strip():
-                return None
+            unpacked = struct.unpack(self.FRAME_FORMAT, frame_bytes)
 
-            f_id = int(parts[0])
+            self.state.timestamp_ms = unpacked[1]
+            stan_raw = unpacked[2]
+            self.state.last_command = unpacked[3]
 
-            # 1. Logika ciągłości (Żółty LED - Dropped Frames)[cite: 25]
-            if self._last_frame_id != -1 and f_id != self._last_frame_id + 1:
-                dropped = f_id - self._last_frame_id - 1
-                if dropped > 0:
-                    self.state.dropped_frames += dropped
-                    self._last_drop_time = time.time()
-                    timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-                    self.logger.warning(
-                        f"[{timestamp}] LUKA: Zgubiono {dropped} ramek (ID: {self._last_frame_id}->{f_id})"
-                    )
+            self.state.altitude = unpacked[4] / 10.0
+            self.state.temp = unpacked[5]
 
-            self._last_frame_id = f_id
+            self.state.mag = Vector3(unpacked[6], unpacked[7], unpacked[8])
+            self.state.accel = Vector3(unpacked[9], unpacked[10], unpacked[11])
+            self.state.gyro = Vector3(unpacked[12], unpacked[13], unpacked[14])
 
-            # 2. Mapowanie stanu misji i logowanie przejść FSM
-            self.state.frame_id = f_id
+            self.state.gpio_state = unpacked[16]
+            self.state.voltage = unpacked[17] / 1000.0
+            self.state.rssi = unpacked[18]
+
             try:
-                new_state = MissionState(parts[1])
+                new_state = MissionState(stan_raw)
                 if new_state != self._prev_mission_state:
-                    self.logger.info(f"Zmiana stanu rakiety: {self._prev_mission_state.value} -> {new_state.value}")
+                    self.logger.info(f"Zmiana stanu rakiety: {self._prev_mission_state.name} -> {new_state.name}")
                     self._prev_mission_state = new_state
                 self.state.state = new_state
             except ValueError:
-                self.state.state = MissionState.IDLE
+                pass
 
-            # 3. Dynamika lotu (IMU 9-osiowe)[cite: 1]
-            self.state.accel = Vector3(float(parts[2]), float(parts[3]), float(parts[4]))
-            self.state.gyro = Vector3(float(parts[5]), float(parts[6]), float(parts[7]))
-            self.state.mag = Vector3(float(parts[8]), float(parts[9]), float(parts[10]))
+            acc = self.state.accel
+            pitch_rad = math.atan2(-acc.x, math.sqrt(acc.y ** 2 + acc.z ** 2 + 1e-6))
+            roll_rad = math.atan2(acc.y, acc.z + 1e-6)
+            self.state.pitch = math.degrees(pitch_rad)
+            self.state.roll = math.degrees(roll_rad)
+            self.state.yaw = 0.0
 
-            # 4. Wysokość i Pozycjonowanie GPS[cite: 1]
-            self.state.altitude = float(parts[11])
-            self.state.latitude = float(parts[12])
-            self.state.longitude = float(parts[13])
-
-            # 5. Hardware & Bio-Payload[cite: 1]
-            self.state.temp_payload = float(parts[14])
-            self.state.voltage = float(parts[15])
-            self.state.current = float(parts[16])
-            self.state.strain_gauge = float(parts[17])
-
-            # 6. Orientacja dla Navballa (Pitch, Roll, Yaw)[cite: 1, 13]
-            self.state.pitch = float(parts[18])
-            self.state.roll = float(parts[19])
-            self.state.yaw = float(parts[20])
-
-            # Aktualizacja timestampów diagnostycznych
             self._last_valid_time = time.time()
             self.state.last_update = self._last_valid_time
-            self.state.timestamp = self._last_valid_time
 
             return self.state
 
-        except (ValueError, IndexError) as e:
-            # Rejestrowanie błędów transmisji/parsowania jako status BLUE w terminalu[cite: 2, 25]
-            self.logger.error(f"Błąd parsowania linii: '{line}'. Szczegóły: {e}")
+        except struct.error as e:
+            self.logger.error(f"Błąd rozpakowania struktury: {e}")
             return None
 
     def get_connection_status(self) -> ConnectionStatus:
-        """
-        Oblicza status połączenia i loguje tylko zmiany stanów (NASA standard).
-        """
         now = time.time()
         time_since_last = now - self._last_valid_time
         time_since_drop = now - self._last_drop_time
 
-        # 1. USTALANIE PRIORYTETU STATUSU (bez przerywania funkcji)
         if time_since_last > 2.0:
-            current_status = ConnectionStatus.DISCONNECTED  # BLACK[cite: 42]
+            current_status = ConnectionStatus.DISCONNECTED  # BLACK
 
         elif self.state.voltage > 0 and self.state.voltage < 3.4:
-            current_status = ConnectionStatus.ERROR  # RED[cite: 42]
+            current_status = ConnectionStatus.ERROR  # RED
 
         elif time_since_drop < 1.0:
-            current_status = ConnectionStatus.DROPPED_FRAMES  # YELLOW[cite: 42]
+            current_status = ConnectionStatus.DROPPED_FRAMES  # YELLOW
 
         else:
-            current_status = ConnectionStatus.CONNECTED  # GREEN[cite: 2, 42]
+            current_status = ConnectionStatus.CONNECTED  # GREEN
 
-        # 2. LOGOWANIE PRZEJŚĆ MIĘDZY STANAMI (NASA Standard)
-        # Wykonuje się tylko raz, w momencie zmiany stanu
         if current_status != self._prev_conn_status:
             if current_status == ConnectionStatus.DISCONNECTED:
                 self.logger.error(f"UTRATA SYGNAŁU: Brak danych od {time_since_last:.1f}s")
@@ -120,11 +106,9 @@ class TelemetryParser:
                     f"DEGRADACJA LINKU: Wykryto luki w transmisji LoRa (Suma zgubionych: {self.state.dropped_frames})")
 
             elif current_status == ConnectionStatus.CONNECTED:
-                # Logujemy powrót do normy tylko jeśli wcześniej był błąd lub rozłączenie[cite: 6, 15]
                 if self._prev_conn_status in [ConnectionStatus.DISCONNECTED, ConnectionStatus.ERROR]:
                     self.logger.info("POŁĄCZENIE ODZYSKANE: Link telemetrii stabilny")
 
-            # Aktualizacja poprzedniego stanu dla kolejnej klatki[cite: 6, 15]
             self._prev_conn_status = current_status
 
         return current_status

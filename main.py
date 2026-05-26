@@ -12,14 +12,12 @@ from ui.components import PayloadManager
 
 class MissionControlApp:
     def __init__(self):
-        # Inicjalizacja Core[cite: 3, 4]
         self.serial = SerialManager()
         self.parser = TelemetryParser()
         self.logger = MissionLogger()
         self.tx_timer = 0.0
         self.rx_timer = 0.0
 
-        # Inicjalizacja UI[cite: 11, 14]
         self.layout = MissionControlLayout()
         self.terminal = None
         self.payload_mgr = None
@@ -28,35 +26,35 @@ class MissionControlApp:
 
         self.terminal_raw = TerminalComponent("raw_telemetry_feed", "raw_feed_container")
 
-        # Setup DPG[cite: 12]
+        self.replay_thread = None
+        self.replay_running = False
+        self.replay_paused = False
+        self.selected_replay_file = None
+
         dpg.create_context()
         theme.apply_skylink_theme()
         theme.setup_fonts()
 
     def setup(self):
-        """Konfiguracja okna i callbacków[cite: 18]."""
-        self.logger.info("Initializing UI Layout...")  # <--- LOG STARTU UI[cite: 21]
+        self.logger.info("Initializing UI Layout...")
         dpg.create_viewport(title='FST AGH - Mission Control v2', width=1300, height=800)
         dpg.set_viewport_min_width(1200)
         dpg.set_viewport_min_height(700)
         self.layout.create_layout()
         self.payload_mgr = PayloadManager("temp_plot_series")
 
-        # 1. Terminal główny (Logger) - korzysta z dolnego checkboxa
         self.terminal = TerminalComponent(
             self.layout.terminal_id,
             "terminal_container",
             "autoscroll_check"
         )
 
-        # 2. Terminal RAW - korzysta z checkboxa w zakładce Communication
         self.terminal_raw = TerminalComponent(
             "raw_telemetry_feed",
             "raw_feed_container",
             "raw_autoscroll_check"
         )
 
-        # 3. Terminal CMD - korzysta z drugiego checkboxa w zakładce
         self.terminal_cmd = TerminalComponent(
             "command_console",
             "command_console_container",
@@ -65,7 +63,6 @@ class MissionControlApp:
 
         self.logger.add_ui_handler(self.terminal.append)
 
-        # Podpięcie callbacków do przycisków[cite: 14]
         dpg.configure_item("scan_btn", callback=self._on_scan)
         dpg.configure_item("connect_btn", callback=self._on_connect)
         dpg.configure_item("send_btn", callback=self._on_send)
@@ -74,13 +71,22 @@ class MissionControlApp:
         dpg.configure_item("clear_raw_btn", callback=self.terminal_raw.clear)
         dpg.configure_item("clear_cmd_btn", callback=self.terminal_cmd.clear)
 
-        # Przyciski krytyczne[cite: 1]
+        dpg.configure_item("replay_play_btn", callback=self._on_replay_play)
+        dpg.configure_item("replay_pause_btn", callback=self._on_replay_pause)
+        dpg.configure_item("replay_stop_btn", callback=self._on_replay_stop)
+
+        dpg.configure_item("replay_select_file_btn", callback=lambda: dpg.show_item("replay_file_dialog"))
+        dpg.configure_item("replay_file_dialog", callback=self._on_file_selected)
+
         dpg.configure_item("arm_btn", callback=lambda: self._send_cmd("ARM"))
+        dpg.configure_item("disarm_btn", callback=lambda: self._send_cmd("DISARM"))
+        dpg.configure_item("reset_btn", callback=lambda: self._send_cmd("RESET"))
         dpg.configure_item("abort_btn", callback=lambda: self._send_cmd("ABORT"))
 
-        dpg.configure_item("drogue_btn", callback=lambda: self._send_cmd("DEPLOY_DROGUE"))
-        dpg.configure_item("main_para_btn", callback=lambda: self._send_cmd("DEPLOY_MAIN"))
-        dpg.configure_item("reset_btn", callback=lambda: self._send_cmd("RESET_DYNAMIXELS"))
+        dpg.configure_item("deploy_btn", callback=lambda: self._send_cmd("DEPLOY_CHUTE"))
+
+        dpg.configure_item("buzzer_test_btn", callback=lambda: self._send_cmd("TEST_BUZZER"))
+        dpg.configure_item("servo_test_btn", callback=lambda: self._send_cmd("TEST_SERVOS"))
 
         def refocus_callback():
             dpg.focus_item("cmd_input")
@@ -90,13 +96,11 @@ class MissionControlApp:
         dpg.configure_item("cmd_autoscroll_check", callback=refocus_callback)
 
     def _on_scan(self):
-        """Skanowanie dostępnych portów COM."""
         ports = self.serial.scan_ports()
         dpg.configure_item("port_combo", items=ports)
         self.logger.info(f"Scanned ports: {ports}")
 
     def _on_connect(self):
-        """Obsługa łączenia/rozłączania[cite: 3]."""
         if self.serial.is_running:
             self.serial.disconnect()
             self.logger.warning("Disconnected from port")
@@ -107,10 +111,8 @@ class MissionControlApp:
             else:
                 self.logger.error("Failed to connect!")
 
-    # main.py - Poprawione metody klasy MissionControlApp
 
     def _on_send(self):
-        """Wysyła komendę i czyści pole."""
         cmd = dpg.get_value("cmd_input")
         if not cmd.strip():
             return
@@ -119,9 +121,7 @@ class MissionControlApp:
         dpg.focus_item("cmd_input")
 
     def _send_cmd(self, cmd):
-        """Logika wysyłania danych z impulsem LED[cite: 41, 44]."""
         if self.serial.send_data(cmd):
-            # Zapalamy diodę Blue i ustawiamy czas trwania impulsu (np. 100ms)
             StatusIndicator.set_led("tx_led", theme.STATUS_BLUE)
             self.tx_timer = time.time() + 0.1
 
@@ -131,40 +131,30 @@ class MissionControlApp:
         return False
 
     def _log_raw(self, text):
-        """Logowanie surowych danych i przewijanie kontenera[cite: 14]."""
         current_val = dpg.get_value("raw_telemetry_feed")
         lines = (current_val + "\n" + text).split('\n')
         dpg.set_value("raw_telemetry_feed", "\n".join(lines[-50:]))
 
         if dpg.get_value("raw_autoscroll_check"):
             try:
-                # Przewijamy kontener okna, nie pole tekstowe[cite: 14]
                 dpg.set_y_scroll("raw_feed_container", -1.0)
             except:
                 pass
 
     def _append_to_feed(self, text):
-        """Dodaje nową linię do panelu TELEMETRY FEED w zakładce COMMUNICATION."""
         self.raw_feed_buffer.append(text)
 
-        # Trzymamy tylko 100 ostatnich linii, żeby nie obciążać aplikacji
         if len(self.raw_feed_buffer) > 100:
             self.raw_feed_buffer.pop(0)
 
         try:
-            # Wpisz tekst do pola
             dpg.set_value("raw_telemetry_feed", "\n".join(self.raw_feed_buffer))
-
-            # Autoscroll (przewijanie na sam dół)
             if dpg.get_value("autoscroll_check"):
                 dpg.set_y_scroll("raw_telemetry_container", -1.0)
         except Exception:
             pass
 
-        # W main_2.py, metoda run()
-
     def run(self):
-        """Główna pętla aplikacji (Real-time update)."""
         dpg.setup_dearpygui()
         dpg.show_viewport()
         dpg.set_primary_window("Primary Window", True)
@@ -173,87 +163,173 @@ class MissionControlApp:
             now = time.time()
             lines_processed = 0
             while not self.serial.raw_queue.empty() and lines_processed < 20:
-                raw_line = self.serial.raw_queue.get()
+                raw_bytes = self.serial.raw_queue.get()
                 lines_processed += 1
 
                 StatusIndicator.set_led("rx_led", theme.STATUS_GREEN)
                 self.rx_timer = now + 0.1
 
-                self.logger.log_raw_frame(raw_line)
-                self.terminal_raw.append(f"RX > {raw_line}")  # Tu tylko dodajemy do bufora
+                raw_hex = raw_bytes.hex(' ').upper()
 
-                frame = self.parser.parse_line(raw_line)
+                self.logger.log_raw_frame(raw_hex)
+                self.terminal_raw.append(f"RX > {raw_hex}")
+
+                frame = self.parser.parse_frame(raw_bytes)
                 if frame:
-                    # Aktualizacja Navballa i metryk (to jest lekkie)
+                    self.logger.log_telemetry(frame)
+
                     self.layout.navball.update(frame.pitch, frame.roll, frame.yaw)
                     FlightDataDisplays.update_state(frame.state)
-                    FlightDataDisplays.update_metrics(frame.altitude, frame.voltage, frame.temp, frame.strain_gauge)
-                    if self.payload_mgr:
-                        self.payload_mgr.update(frame.temp_payload, frame.current)
+                    FlightDataDisplays.update_metrics(frame.altitude, frame.voltage, frame.temp)
 
-            # 2. KLUCZOWY MOMENT: Aktualizujemy terminale RAZ po przetworzeniu paczki danych
+                    if self.payload_mgr:
+                        self.payload_mgr.update(frame.temp, 0.0)
+
             self.terminal.update_ui()
             self.terminal_raw.update_ui()
             self.terminal_cmd.update_ui()
             self._update_indicators(now)
 
-            # 3. Aktualizacja statusów systemowych
             current_status = self.parser.get_connection_status()
             StatusIndicator.set_main_led(current_status)
             dpg.set_value("bitrate_text", f"{self.serial.bitrate:.1f} kb/s")
 
-            # 4. Renderowanie
             dpg.render_dearpygui_frame()
 
-        # Shutdown
-        self.logger.info("Mission Control Session Ended")  # <--- DODAJ TO[cite: 21]
+        self.logger.info("Mission Control Session Ended")
         self.serial.disconnect()
         dpg.destroy_context()
 
     def _update_indicators(self, now):
-        """Zarządza miganiem i resetowaniem LED-ów[cite: 40, 42]."""
         status = self.parser.get_connection_status()
 
-        # --- GŁÓWNY LED ---
         if status == ConnectionStatus.DROPPED_FRAMES:
-            # Miganie żółte: co 200ms (5 razy na sekundę)
             is_on = (int(now * 5) % 2) == 0
             color = theme.STATUS_AMBER if is_on else theme.COLOR_BLACK
             StatusIndicator.set_led("main_status_led", color)
         else:
-            # Standardowe kolory: Czerwony (Błąd), Zielony (OK), Czarny (Brak)
             StatusIndicator.set_main_led(status)
 
-        # --- RX / TX LED (Reset do czarnego po upływie czasu) ---
         if now > self.tx_timer:
             StatusIndicator.set_led("tx_led", theme.COLOR_BLACK)
         if now > self.rx_timer:
             StatusIndicator.set_led("rx_led", theme.COLOR_BLACK)
 
     def _log_raw(self, text):
-        """Loguje surową telemetrię i przewija RAW FEED."""
         current_val = dpg.get_value("raw_telemetry_feed")
         lines = (current_val + "\n" + text).split('\n')
         dpg.set_value("raw_telemetry_feed", "\n".join(lines[-50:]))
 
         if dpg.get_value("raw_autoscroll_check"):
             try:
-                # Przewijanie do aktualnego maksimum kontenera
                 dpg.set_y_scroll("raw_feed_container", dpg.get_y_scroll_max("raw_feed_container"))
             except:
                 pass
 
     def _log_command(self, text):
-        """Loguje komendy i przewija COMMAND CONSOLE."""
         current_val = dpg.get_value("command_console")
         dpg.set_value("command_console", current_val + "\n" + text)
 
         if dpg.get_value("cmd_autoscroll_check"):
             try:
-                # Przewijanie do aktualnego maksimum kontenera
                 dpg.set_y_scroll("command_console_container", dpg.get_y_scroll_max("command_console_container"))
             except:
                 pass
+
+    def _on_replay_play(self):
+        if self.replay_paused:
+            self.replay_paused = False
+            self.logger.info("Wznowiono odtwarzanie logów.")
+            return
+
+        if self.replay_running:
+            return
+
+        if not self.selected_replay_file:
+            self.logger.error("Nie wybrano pliku! Kliknij 'CHOOSE LOG FILE' przed uruchomieniem.")
+            return
+
+        import threading
+        self.replay_running = True
+        self.replay_paused = False
+        self.replay_thread = threading.Thread(target=self._replay_loop, args=(self.selected_replay_file,), daemon=True)
+        self.replay_thread.start()
+        self.logger.info("Uruchomiono symulację lotu z pliku zewnętrznego.")
+
+    def _on_replay_pause(self):
+        if self.replay_running:
+            self.replay_paused = True
+            self.logger.warning("Wstrzymano odtwarzanie logów.")
+
+    def _on_replay_stop(self):
+        self.replay_running = False
+        self.replay_paused = False
+        self.logger.error("Zatrzymano odtwarzanie. Reset kolejki.")
+
+    def _replay_loop(self, file_path):
+        clean_lines = []
+        try:
+            import csv
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                first_line = f.readline()
+                f.seek(0)
+
+                if ',' in first_line:
+                    reader = csv.reader(f)
+                    header = next(reader, None)
+                    if header and not header[0].replace('.', '', 1).isdigit() and "timestamp" not in header[0]:
+                        f.seek(0)
+                        reader = csv.reader(f)
+
+                    for row in reader:
+                        if len(row) >= 2:
+                            clean_lines.append(row[1].strip())
+                        elif len(row) == 1:
+                            clean_lines.append(row[0].strip())
+
+                else:
+                    for line in f:
+                        line = line.strip()
+                        if not line: continue
+                        if "RX > " in line: line = line.split("RX > ")[1]
+                        clean_lines.append(line)
+
+        except Exception as e:
+            self.logger.error(f"Krytyczny błąd odczytu pliku: {e}")
+            self.replay_running = False
+            return
+
+        for line in clean_lines:
+            while self.replay_paused and self.replay_running:
+                time.sleep(0.1)
+            if not self.replay_running:
+                break
+
+            try:
+                hex_str = line.replace(" ", "")
+                raw_bytes = bytes.fromhex(hex_str)
+
+                self.serial.raw_queue.put(raw_bytes)
+
+                speed = dpg.get_value("replay_speed_slider")
+                time.sleep(0.05 / max(0.1, speed))
+
+            except Exception as e:
+                self.logger.error(f"Błąd dekodowania ramki '{line}': {e}")
+
+        self.replay_running = False
+        self.logger.info("Zakończono odtwarzanie historycznego logu misji.")
+
+
+    def _on_file_selected(self, sender, app_data):
+        file_path = app_data.get("file_path_name", "")
+        file_name = app_data.get("file_name", "")
+
+        if file_path:
+            self.selected_replay_file = file_path
+            dpg.set_value("replay_file_path_text", f"LOADED: {file_name}\nFull path: {file_path}")
+            dpg.configure_item("replay_file_path_text", color=theme.STATUS_GREEN)
+            self.logger.info(f"Załadowano plik repliki lotu: {file_name}")
 
 
 if __name__ == "__main__":

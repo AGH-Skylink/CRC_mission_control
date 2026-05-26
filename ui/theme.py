@@ -2,13 +2,11 @@ import dearpygui.dearpygui as dpg
 import logging
 import os
 
-# --- DEFINICJA PALETY KOLORYSTYCZNEJ (ZGODNIE ZE ZDJĘCIEM) ---
 COLOR_TEAL = (9, 108, 108)  # #096C6C
 COLOR_LIGHT_GRAY = (196, 196, 196)  # #C4C4C4
 COLOR_BLACK = (0, 0, 0)  # #000000
 COLOR_DARK_BLUE = (22, 53, 77)  # #16354D
 
-# Aliasy dla logiki UI
 ACCENT_PRIMARY = COLOR_TEAL
 ACCENT_TRANS = (9, 108, 108, 100)
 BG_PANEL = COLOR_BLACK
@@ -16,7 +14,6 @@ BG_CHILD = COLOR_DARK_BLUE
 TEXT_NORMAL = COLOR_LIGHT_GRAY
 TEXT_MAIN = (255, 255, 255)
 
-# Kolory statusów
 STATUS_RED = (230, 50, 50)
 STATUS_GREEN = (50, 230, 50)
 STATUS_BLUE = (0, 119, 255)
@@ -24,9 +21,7 @@ STATUS_AMBER = (255, 191, 0)
 
 
 def apply_skylink_theme():
-    """Konfiguruje nowy motyw wizualny oparty na ciemnej palecie morskiej."""
     with dpg.theme() as global_theme:
-        # 1. OGÓLNE STYLE INTERFEJSU
         with dpg.theme_component(dpg.mvAll):
             dpg.add_theme_color(dpg.mvThemeCol_WindowBg, COLOR_BLACK)
             dpg.add_theme_color(dpg.mvThemeCol_ChildBg, COLOR_DARK_BLUE)
@@ -40,7 +35,6 @@ def apply_skylink_theme():
             dpg.add_theme_style(dpg.mvStyleVar_WindowBorderSize, 0)
             dpg.add_theme_style(dpg.mvStyleVar_ChildRounding, 4)
 
-        # 2. POPRAWKA: STYLE DLA WYKRESÓW (PLOT)
         with dpg.theme_component(dpg.mvPlot):
             dpg.add_theme_color(dpg.mvPlotCol_PlotBg, (5, 15, 25), category=dpg.mvThemeCat_Plots)
             dpg.add_theme_color(dpg.mvPlotCol_PlotBorder, COLOR_TEAL, category=dpg.mvThemeCat_Plots)
@@ -50,7 +44,6 @@ def apply_skylink_theme():
 
 
 def setup_fonts():
-    """Ustawia czcionkę systemową."""
     logger = logging.getLogger("MissionControl")
     font_path = "assets/fonts/Inter-Regular.ttf"
 
@@ -74,7 +67,6 @@ def setup_fonts():
 
 
 def create_button_theme(color):
-    """Tworzy motyw dla przycisków funkcyjnych."""
     with dpg.theme() as btn_theme:
         with dpg.theme_component(dpg.mvButton):
             dpg.add_theme_color(dpg.mvThemeCol_Button, color)

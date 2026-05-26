@@ -30,7 +30,6 @@ class NavballWidget:
                 dpg.draw_rectangle((-400, -400), (400, 0), color=self.sky_color, fill=self.sky_color)
                 dpg.draw_rectangle((-400, 0), (400, 400), color=self.ground_color, fill=self.ground_color)
 
-                # Drabinka Pitch (Pitch Ladder)
                 for i in range(-90, 100, 10):
                     if i == 0: continue
                     y_pos = -(i / 90.0) * self.radius
@@ -38,52 +37,37 @@ class NavballWidget:
                     dpg.draw_line((-line_width, y_pos), (line_width, y_pos), color=self.line_color, thickness=1)
                     dpg.draw_text((-line_width - 25, y_pos - 7), str(i), size=12, color=self.line_color)
 
-                # Linia horyzontu (Główna)
                 dpg.draw_line((-400, 0), (400, 0), color=theme.COLOR_LIGHT_GRAY, thickness=2)
 
-            # --- 2. MASKA KOŁOWA (DONUT TRICK) ---
             mask_thickness = 200
             mask_radius = self.radius + (mask_thickness / 2)
             dpg.draw_circle((self.center_x, self.center_y), mask_radius, color=theme.BG_PANEL,
                             thickness=mask_thickness)
 
-            # Obramowanie Navballa (Teal)
             dpg.draw_circle((self.center_x, self.center_y), self.radius, color=theme.ACCENT_PRIMARY, thickness=2)
 
-            # --- 3. CELOWNIK STAŁY (WINGS) ---
             c_x, c_y = self.center_x, self.center_y
-            # Lewe skrzydło
             dpg.draw_line((c_x - 50, c_y), (c_x - 15, c_y), color=theme.STATUS_AMBER, thickness=3)
             dpg.draw_line((c_x - 15, c_y), (c_x - 15, c_y + 10), color=theme.STATUS_AMBER, thickness=3)
-            # Prawe skrzydło
             dpg.draw_line((c_x + 15, c_y), (c_x + 50, c_y), color=theme.STATUS_AMBER, thickness=3)
-            dpg.draw_line((c_x + 15, c_y), (c_x + 15, c_y + 10), color=theme.STATUS_AMBER, thickness=3)
-            # Kropka centralna
             dpg.draw_circle((c_x, c_y), 3, color=theme.STATUS_AMBER, fill=theme.STATUS_AMBER)
 
-            # --- 4. WSKAŹNIKI OSOWE (SLIDERS) ---
-            # Yaw (Góra)
             dpg.draw_rectangle((c_x - 80, c_y - 150), (c_x + 80, c_y - 142), color=theme.ACCENT_TRANS,
                                fill=theme.COLOR_BLACK)
             dpg.draw_triangle((c_x, c_y - 146), (c_x - 5, c_y - 136), (c_x + 5, c_y - 136), fill=theme.STATUS_AMBER,
                               tag=self.yaw_indicator)
 
-            # Pitch (Lewo)
             dpg.draw_rectangle((c_x - 155, c_y - 80), (c_x - 147, c_y + 80), color=theme.ACCENT_TRANS,
                                fill=theme.COLOR_BLACK)
             dpg.draw_circle((c_x - 151, c_y), 6, color=theme.STATUS_AMBER, fill=theme.STATUS_AMBER,
                             tag=self.pitch_indicator)
 
-            # Roll (Prawo)
             dpg.draw_rectangle((c_x + 147, c_y - 80), (c_x + 155, c_y + 80), color=theme.ACCENT_TRANS,
                                fill=theme.COLOR_BLACK)
             dpg.draw_circle((c_x + 151, c_y), 6, color=theme.STATUS_AMBER, fill=theme.STATUS_AMBER,
                             tag=self.roll_indicator)
 
     def update(self, pitch: float, roll: float, yaw: float):
-        """Aktualizacja orientacji instrumentu na podstawie fuzji czujników."""
-
-        # 1. Transformacja macierzowa horyzontu (Hardware Accelerated)
         pitch_px = (pitch / 90.0) * self.radius
 
         trans_center = dpg.create_translation_matrix([self.center_x, self.center_y])
@@ -92,7 +76,6 @@ class NavballWidget:
 
         dpg.apply_transform(self.horizon_node, trans_center * rot_mat * trans_pitch)
 
-        # 2. Aktualizacja pozycji wskaźników
         yaw_x = self.center_x + (yaw / 180.0) * 80
         dpg.configure_item(self.yaw_indicator, p1=(yaw_x, self.center_y - 146), p2=(yaw_x - 5, self.center_y - 136),
                            p3=(yaw_x + 5, self.center_y - 136))

@@ -190,7 +190,45 @@ class MissionControlLayout:
                         with dpg.child_window(width=-1, height=-1, border=False, tag="terminal_container"):
                             dpg.add_text("", tag=self.terminal_id)
 
+                    # KARTA: FLIGHT REPLAY
+                    with dpg.tab(label="FLIGHT REPLAY"):
+                        dpg.add_spacer(height=10)
+                        dpg.add_text("POST-FLIGHT SIMULATION & LOG REPLAY", color=theme.ACCENT_PRIMARY)
+
+                        # Kontrolki odtwarzacza (PLAY, PAUSE, STOP)
+                        with dpg.group(horizontal=True):
+                            play_btn = dpg.add_button(label="PLAY REPLAY", width=100, tag="replay_play_btn")
+                            pause_btn = dpg.add_button(label="PAUSE", width=80, tag="replay_pause_btn")
+                            stop_btn = dpg.add_button(label="STOP / RESET", width=100, tag="replay_stop_btn")
+
+                            dpg.add_spacer(width=20)
+                            dpg.add_slider_float(label="Playback Speed", default_value=1.0, min_value=0.5,
+                                                 max_value=5.0, width=150, tag="replay_speed_slider")
+
+                            # Bindowanie dedykowanego motywu dla przycisków odtwarzacza
+                            replay_theme = theme.create_button_theme(theme.COLOR_TEAL)
+                            for btn in [play_btn, pause_btn, stop_btn]:
+                                dpg.bind_item_theme(btn, replay_theme)
+
+                        dpg.add_spacer(height=20)
+                        dpg.add_text("Wybierz plik z logami misji z dysku:", color=theme.TEXT_NORMAL)
+
+                        # NOWE ELEMENTY: Przycisk wyboru i etykieta ścieżki pliku
+                        with dpg.group(horizontal=True):
+                            select_file_btn = dpg.add_button(label="CHOOSE LOG FILE", width=180,
+                                                             tag="replay_select_file_btn")
+                            dpg.bind_item_theme(select_file_btn, replay_theme)
+
+                        dpg.add_spacer(height=10)
+                        # Tu wyświetli się nazwa załadowanego pliku
+                        dpg.add_text("No file selected.", tag="replay_file_path_text", color=theme.STATUS_AMBER)
+
             dpg.add_separator()
+
+            with dpg.file_dialog(directory_selector=False, show=False, tag="replay_file_dialog", width=700, height=450):
+                dpg.add_file_extension(".csv", color=(0, 255, 0, 255), custom_text="[CSV Raw Telemetry Frames]")
+                dpg.add_file_extension(".txt", color=(0, 255, 255, 255), custom_text="[TXT Console Log dumps]")
+                dpg.add_file_extension(".*", color=(150, 150, 150, 255), custom_text="All files")
 
             # --- 3. PRZYKLEJONY PANEL DOLNY ---
             with dpg.group(tag="fixed_bottom_panel"):
@@ -204,30 +242,30 @@ class MissionControlLayout:
 
                 # Pasek Mission Critical
                 with dpg.child_window(height=50, border=False, no_scrollbar=True):
-                    # TWORZYMY JEDEN WSPÓLNY MOTYW DLA WSZYSTKICH PRZYCISKÓW (MORSKI #096C6C)
                     action_theme = theme.create_button_theme(theme.COLOR_TEAL)
 
                     with dpg.group(horizontal=True):
-                        # Przyciski kontrolne - wszystkie w tym samym kolorze
-                        arm_btn = dpg.add_button(label="ARM & SYNC", width=110, tag="arm_btn")
-                        disarm_btn = dpg.add_button(label="DISARM", width=90, tag="disarm_btn")
-                        reset_btn = dpg.add_button(label="RESET", width=80, tag="reset_btn")
+                        # Główne kontrolki
+                        arm_btn = dpg.add_button(label="ARM SYSTEM", width=110, tag="arm_btn")
+                        disarm_btn = dpg.add_button(label="DISARM", width=80, tag="disarm_btn")
+                        reset_btn = dpg.add_button(label="RESET", width=70, tag="reset_btn")
 
-                        dpg.add_spacer(width=10)
-                        dpg.add_text("STATION READY", color=theme.TEXT_NORMAL)
-                        dpg.add_spacer(width=10)
+                        dpg.add_spacer(width=15)
 
-                        drogue_btn = dpg.add_button(label="DROGUE", width=90, tag="drogue_btn")
-                        main_btn = dpg.add_button(label="MAIN", width=90, tag="main_para_btn")
-                        abort_btn = dpg.add_button(label="ABORT", width=80, tag="abort_btn")
+                        # Testy systemowe (Zgodnie z procedurą CRC)
+                        buzzer_test_btn = dpg.add_button(label="TEST BUZZER", width=100, tag="buzzer_test_btn")
+                        servo_test_btn = dpg.add_button(label="TEST SERVOS", width=100, tag="servo_test_btn")
 
-                        # BINDOWANIE JEDNEGO MOTYWU DO WSZYSTKICH PRZYCISKÓW
-                        dpg.bind_item_theme(arm_btn, action_theme)
-                        dpg.bind_item_theme(disarm_btn, action_theme)
-                        dpg.bind_item_theme(reset_btn, action_theme)
-                        dpg.bind_item_theme(drogue_btn, action_theme)
-                        dpg.bind_item_theme(main_btn, action_theme)
-                        dpg.bind_item_theme(abort_btn, action_theme)
+                        dpg.add_spacer(width=15)
+
+                        # Awaryjne
+                        deploy_btn = dpg.add_button(label="EMERGENCY DEPLOY", width=140, tag="deploy_btn")
+                        abort_btn = dpg.add_button(label="ABORT", width=70, tag="abort_btn")
+
+                        # Bindowanie motywów
+                        for btn in [arm_btn, disarm_btn, reset_btn, buzzer_test_btn, servo_test_btn, deploy_btn,
+                                    abort_btn]:
+                            dpg.bind_item_theme(btn, action_theme)
 
 
     def update_led(self, tag, color):
