@@ -103,6 +103,9 @@ class FlightDataDisplays:
             dpg.set_value("hw_gyr_x", f"GYR X: {frame.gyro.x:.0f}")
             dpg.set_value("hw_gyr_y", f"GYR Y: {frame.gyro.y:.0f}")
             dpg.set_value("hw_gyr_z", f"GYR Z: {frame.gyro.z:.0f}")
+            dpg.set_value("hw_mag_x", f"MAG X: {frame.mag.x:.0f}")
+            dpg.set_value("hw_mag_y", f"MAG Y: {frame.mag.y:.0f}")
+            dpg.set_value("hw_mag_z", f"MAG Z: {frame.mag.z:.0f}")
 
             # BARO BMP280
             dpg.set_value("hw_baro_alt", f"ALT: {frame.altitude:.1f} m")

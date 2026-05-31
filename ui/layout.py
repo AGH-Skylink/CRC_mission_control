@@ -122,6 +122,10 @@ class MissionControlLayout:
                                     dpg.add_text("GYR X: --", tag="hw_gyr_x")
                                     dpg.add_text("GYR Y: --", tag="hw_gyr_y")
                                     dpg.add_text("GYR Z: --", tag="hw_gyr_z")
+                                    dpg.add_spacer(height=5)
+                                    dpg.add_text("MAG X: --", tag="hw_mag_x")
+                                    dpg.add_text("MAG Y: --", tag="hw_mag_y")
+                                    dpg.add_text("MAG Z: --", tag="hw_mag_z")
 
                                 # 2. Panel Barometru
                                 with dpg.child_window(width=panel_w, height=panel_h, border=True):
