@@ -1,85 +1,74 @@
-# Skylink Mission Control – CRC 2026
+# CRC Mission Control
 
-A professional **Ground Station** designed for the **FST AGH** team for the CRC 2026 competition.  
-The application is used for real‑time rocket telemetry monitoring, supervision of the AstroBio biological experiment, and visualization of spatial orientation.
+[![Python](https://img.shields.io/badge/Language-Python_3.10+-blue?style=flat-square&logo=python)](https://www.python.org/)
+[![DearPyGui](https://img.shields.io/badge/GUI-DearPyGui-red?style=flat-square&logo=python)](https://dearpygui.readthedocs.io/)
+[![NumPy](https://img.shields.io/badge/Data-NumPy-013243?style=flat-square&logo=numpy)](https://numpy.org/)
+[![Serial](https://img.shields.io/badge/Communication-PySerial-orange?style=flat-square&logo=arduino)](https://pyserial.readthedocs.io/)
+[![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 
-## 🚀 Main Features
+**CRC Mission Control** is a high-performance ground station software suite engineered for the AGH-Skylink rocketry team. It provides real-time telemetry monitoring, flight command capabilities, and robust data logging for high-power rocket missions.
 
-* **Real‑time Telemetry**: Receiving and parsing LoRa/STM32 data at up to 20 Hz.
-* **3D Navball (GPU)**: Hardware‑accelerated artificial horizon visualization (Roll, Pitch, Yaw) using transformation matrices.
-* **Biological Payload Monitor**: A dedicated tab for supervising the algae experiment, including real‑time temperature charts and large UV indicators.
-* **Audit Trail & Logging**: Dual logging system – telemetry saved to CSV and system logs (operator actions, connection errors).
-* **Skylink Design**: Teal/Dark interface optimized for readability and NASA‑Modern ergonomics.
+---
 
-## 📂 Project Structure
+## 🚀 Overview
+Mission Control acts as the central hub between the flight computer and mission operators. By utilizing **DearPyGui**, it delivers an ultra-responsive, GPU-accelerated interface capable of rendering complex flight data and 3D orientation in real-time without straining system resources.
 
-### `/core` – Logic and Data
-* **`data_types.py`**: Defines data models `TelemetryFrame` and mission (`MissionState`) and connection (`ConnectionStatus`) states.
-* **`serial_manager.py`**: Manages threaded COM‑port communication, calculates bitrate, and handles raw‑data queuing.
-* **`telemetry.py`**: Advanced CSV parser that monitors frame continuity and manages LED status logic.
-* **`logger.py`**: Handles asynchronous data writing to files in the `/logs` directory.
+## ✨ Key Features
 
-### `/ui` – User Interface
-* **`theme.py`**: Defines the Skylink AGH color palette, visual styles, and manages font/icon loading.
-* **`layout.py`**: Main window structure, HARDWARE/PAYLOAD tab layout, and definitions of the Top Bar and Bottom Bar.
-* **`navball.py`**: PFD (Primary Flight Display) widget rendering the artificial horizon using the GPU.
-* **`components.py`**: Collection of components such as Terminal, LED indicators, and the `PayloadManager` handling charts.
+### 📡 Real-Time Telemetry & Monitoring
+* **High-Frequency Data Parsing**: Efficiently decodes 50-byte binary telemetry frames using custom struct packing.
+* **Live Status Dashboard**: Monitors critical flight parameters: altitude, temperature, battery voltage, and RSSI with intelligent alert thresholds.
+* **Connection Health**: Advanced Link Quality monitoring with automated detection of dropped frames and signal loss.
 
-### Main Files
-* **`main.py`**: The heart of the application, connecting logic with UI in a high‑performance loop.
-* **`simulator.py`**: Advanced telemetry generator simulating rocket flight physics.
-* **`requirements.txt`**: List of library dependencies.
+### 🧭 Advanced Flight Visualization
+* **Custom Navball Widget**: A high-fidelity, GPU-drawn attitude indicator showing real-time Pitch, Roll, and Yaw.
+* **Trajectory Tracking**: Live map and path visualization using integrated graphing tools to track flight descent and landing recovery.
 
-## 🛠️ Installation and Launch
+### 🛠️ Command & Control
+* **Macro Sequence Engine**: Easily configure and execute automated pre-flight, launch, and abort procedures.
+* **Hardware Interface**: Dedicated control panels for monitoring sensors (IMU, Barometer) and testing pyrotechnic recovery hardware.
 
-1. Install required libraries:
+### 💾 Data Integrity & Analysis
+* **Triple-Layer Logging**: Simultaneous logging of system events, CSV-formatted telemetry data, and raw binary frames for post-flight analysis.
+* **Flight Replayer**: Integrated tools to load and replay mission logs, allowing for "what-if" analysis and debriefing.
+
+---
+
+## 🏗️ Technical Architecture
+
+The application follows a modular architecture designed for maintainability and scalability:
+
+* **Core**: Handles high-speed serial communication (`SerialManager`), binary telemetry deserialization (`TelemetryParser`), and state machine management.
+* **UI**: A reactive layer built on `DearPyGui`, featuring custom themes (`theme.py`), modular components, and complex widgets.
+* **Logging**: A custom logging system that ensures mission-critical data is captured instantly, even in the event of interface crashes.
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+* Python 3.10+
+* `pip`
+
+### Installation
+1. **Clone the repository**:
+   ```bash
+   git clone [https://github.com/AGH-Skylink/CRC_mission_control](https://github.com/AGH-Skylink/CRC_mission_control)
+   cd CRC_mission_control
+   ```
+
+2. **Install dependencies**:
    ```bash
    pip install -r requirements.txt
    ```
-   
-2. Run the application:
+3. **Run the application**:
    ```bash
    python main.py
    ```
-   
 ---
 
-## ⚠️ Critical Buttons
-*   **ARM & SYNC**: Arms recovery systems and synchronizes RTC time.
-*   **ABORT**: Immediate sequence interruption and forced safety mode.
+## 👨‍💻 Project Authorship
+This mission control panel was developed by **[Dobrawa Rumszewicz](https://github.com/tsuruguu)** for the **Czech Rocket Challenge** as part of the **[AGH-Skylink](https://github.com/AGH-Skylink)** scientific society.
 
-
-```python?code_reference&code_event_index=1
-import zipfile
-import os
-
-# File structure definition based on previous specifications
-project_files = {
-    "main.py": """# Contents of main.py according to the latest version...""",
-    "simulator.py": """# Contents of simulator.py...""",
-    "requirements.txt": "dearpygui==1.11.1\npyserial==3.5\nnumpy==1.24.3",
-    ".gitignore": "__pycache__/\nlogs/\n*.py[cod]\nvenv/",
-    "core/data_types.py": """# Contents of data_types.py...""",
-    "core/serial_manager.py": """# Contents of serial_manager.py...""",
-    "core/telemetry.py": """# Contents of telemetry.py...""",
-    "core/logger.py": """# Contents of logger.py...""",
-    "ui/theme.py": """# Contents of theme.py...""",
-    "ui/layout.py": """# Contents of layout.py...""",
-    "ui/components.py": """# Contents of components.py...""",
-    "ui/navball.py": """# Contents of navball.py...""",
-    "README.md": "Skylink Mission Control Documentation"
-}
-
-zip_name = "CRC_mission_control_v2.zip"
-
-with zipfile.ZipFile(zip_name, 'w') as zipf:
-    for file_path, content in project_files.items():
-        # Create directories if they don't exist
-        os.makedirs(os.path.dirname(file_path) if os.path.dirname(file_path) else ".", exist_ok=True)
-        with open(file_path, "w") as f:
-            f.write(content)
-        zipf.write(file_path)
-
-print(zip_name)
-```
-
+*   **GitHub**: [tsuruguu](https://github.com/tsuruguu)
+*   **LinkedIn**: [Dobrawa Rumszewicz](https://www.linkedin.com/in/dobrawa-rumszewicz/)
