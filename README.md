@@ -53,7 +53,7 @@ The application follows a modular architecture designed for maintainability and 
 ### Installation
 1. **Clone the repository**:
    ```bash
-   git clone [https://github.com/AGH-Skylink/CRC_mission_control](https://github.com/AGH-Skylink/CRC_mission_control)
+   git clone https://github.com/AGH-Skylink/CRC_mission_control
    cd CRC_mission_control
    ```
 
