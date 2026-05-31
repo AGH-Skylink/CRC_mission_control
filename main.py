@@ -5,9 +5,8 @@ from core.telemetry import TelemetryParser
 from core.logger import MissionLogger
 from core.data_types import ConnectionStatus
 from ui.layout import MissionControlLayout
-from ui.components import StatusIndicator, TerminalComponent, FlightDataDisplays
+from ui.components import StatusIndicator, TerminalComponent, FlightDataDisplays, PayloadManager, GPSManager
 import ui.theme as theme
-from ui.components import PayloadManager
 
 
 class MissionControlApp:
@@ -15,6 +14,7 @@ class MissionControlApp:
         self.serial = SerialManager()
         self.parser = TelemetryParser()
         self.logger = MissionLogger()
+        self.gps_mgr = GPSManager()
         self.tx_timer = 0.0
         self.rx_timer = 0.0
 
@@ -203,6 +203,8 @@ class MissionControlApp:
 
                     if self.payload_mgr:
                         self.payload_mgr.update(frame.temp, 0.0)
+
+                    self.gps_mgr.update(frame.gps_lat, frame.gps_lon, frame.gps_fix)
 
             self.terminal.update_ui()
             self.terminal_raw.update_ui()

@@ -257,6 +257,25 @@ class MissionControlLayout:
                         # Tu wyświetli się nazwa załadowanego pliku
                         dpg.add_text("No file selected.", tag="replay_file_path_text", color=theme.STATUS_AMBER)
 
+                    # KARTA: GPS TRACKER
+                    with dpg.tab(label="GPS TRACKER"):
+                        dpg.add_spacer(height=10)
+                        dpg.add_text("LIVE ROCKET TRAJECTORY (TOP-DOWN VIEW)", color=theme.ACCENT_PRIMARY)
+
+                        # Wykres mapy (X=Długość, Y=Szerokość)
+                        with dpg.plot(height=-1, width=-1, no_menus=False):
+                            dpg.add_plot_legend()
+
+                            # Oś X: Longitude (Długość geograficzna - Wschód/Zachód)
+                            dpg.add_plot_axis(dpg.mvXAxis, label="Longitude (°E)", tag="gps_x_axis")
+
+                            # Oś Y: Latitude (Szerokość geograficzna - Północ/Południe)
+                            with dpg.plot_axis(dpg.mvYAxis, label="Latitude (°N)", tag="gps_y_axis"):
+                                # Ślad trajektorii
+                                dpg.add_line_series([], [], label="Flight Path", tag="gps_path_series")
+                                # Aktualna pozycja (kropka)
+                                dpg.add_scatter_series([], [], label="Current Position", tag="gps_current_series")
+
             dpg.add_separator()
 
             with dpg.file_dialog(directory_selector=False, show=False, tag="replay_file_dialog", width=700, height=450):

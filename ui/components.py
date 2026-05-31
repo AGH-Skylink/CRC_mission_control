@@ -157,3 +157,28 @@ class PayloadManager:
 
         if len(self.times) > 1:
             dpg.set_axis_limits("temp_x_axis", self.times[0], self.times[-1])
+
+
+class GPSManager:
+    def __init__(self):
+        self.lats = []
+        self.lons = []
+
+    def update(self, lat: float, lon: float, fix: int):
+        if fix > 0 and lat != 0.0 and lon != 0.0:
+
+            if not self.lats or (abs(self.lats[-1] - lat) > 1e-6 or abs(self.lons[-1] - lon) > 1e-6):
+                self.lats.append(lat)
+                self.lons.append(lon)
+
+                dpg.set_value("gps_path_series", [self.lons, self.lats])
+                dpg.set_value("gps_current_series", [[lon], [lat]])
+
+                if len(self.lats) < 2:
+                    dpg.set_axis_limits("gps_x_axis", lon - 0.005, lon + 0.005)
+                    dpg.set_axis_limits("gps_y_axis", lat - 0.005, lat + 0.005)
+                else:
+                    dpg.set_axis_limits_auto("gps_x_axis")
+                    dpg.set_axis_limits_auto("gps_y_axis")
+                    dpg.fit_axis_data("gps_x_axis")
+                    dpg.fit_axis_data("gps_y_axis")

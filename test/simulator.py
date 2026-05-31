@@ -4,13 +4,14 @@ import math
 import random
 import struct
 
+
 class RocketSimulator:
     def __init__(self, port='/dev/ttys003', baudrate=115200):
         try:
             self.ser = serial.Serial(port, baudrate, timeout=1)
-            print(f"🚀 Simulator started on {port}")
+            print(f"Simulator started on {port}")
         except Exception as e:
-            print(f"❌ Error: Could not open port {port}. {e}")
+            print(f"Error: Could not open port {port}. {e}")
             exit()
 
         self.start_time = time.time()
@@ -32,6 +33,7 @@ class RocketSimulator:
         """Generuje fizykę misji."""
         elapsed = time.time() - self.start_time
 
+        # Prosta maszyna stanów
         if self.state == 0 and elapsed > 5:
             self.state = 1
         elif self.state == 1 and elapsed > 6:
@@ -44,6 +46,7 @@ class RocketSimulator:
             self.state = 5
             self.altitude = 0.0
 
+        # Modelowanie lotu
         if self.state == 1:
             self.velocity += 8.8
             self.altitude += self.velocity * 0.1
@@ -61,6 +64,7 @@ class RocketSimulator:
         if self.altitude < 0:
             self.altitude = 0.0
 
+        # Degradacja baterii i szum temp
         self.voltage -= 0.0001
         self.temp += random.uniform(-0.1, 0.1)
 
@@ -76,27 +80,40 @@ class RocketSimulator:
         acc_y = int(math.sin(r_rad) * math.cos(p_rad) * 1000)
         acc_z = int(math.cos(r_rad) * math.cos(p_rad) * 1000)
 
+        # Symulacja ruchu GPS (znoszenie przez wiatr po starcie)
+        base_lat = 50.0647
+        base_lon = 19.9231
+
+        if self.state > 0:
+            # Po starcie rakieta dryfuje w czasie
+            drift = (elapsed_ms / 1000.0) * 0.00005
+        else:
+            drift = 0.0
+
+        sim_lat = base_lat + (drift * 0.5)  # Lekki dryf na północ
+        sim_lon = base_lon + drift  # Mocny dryf na wschód
+
         # Pakowanie wszystkiego w binarną ramkę 50 bajtów
         frame = struct.pack(
             self.FRAME_FORMAT,
-            ord('$'),                 # B: preambuła
-            elapsed_ms,               # I: timestamp
-            self.state,               # B: stan
-            0,                        # B: ostatnia komenda
+            ord('$'),  # B: preambuła
+            elapsed_ms,  # I: timestamp
+            self.state,  # B: stan
+            0,  # B: ostatnia komenda
             int(self.altitude * 10),  # h: wysokość [dm]
-            int(self.temp * 100),     # h: temperatura [1/100 °C]
-            0, 0, 0,                  # 3xh: mag x,y,z
-            acc_x, acc_y, acc_z,      # 3xh: acc x,y,z
-            0, 0, 0,                  # 3xh: gyro x,y,z
-            1,                        # B: GPS fix (symulowany fix)
-            8,                        # B: liczba satelitów
-            50.0647,                  # f: GPS Lat (Kampus AGH)
-            19.9231,                  # f: GPS Lon (Kampus AGH)
-            self.altitude,            # f: GPS Alt
-            0b00000000,               # B: GPIO State (zgodnie z rozpiską)
+            int(self.temp * 100),  # h: temperatura [1/100 °C]
+            0, 0, 0,  # 3xh: mag x,y,z
+            acc_x, acc_y, acc_z,  # 3xh: acc x,y,z
+            0, 0, 0,  # 3xh: gyro x,y,z
+            1,  # B: GPS fix (symulowany fix)
+            8,  # B: liczba satelitów
+            sim_lat,  # f: GPS Lat (zmienna po wietrze)
+            sim_lon,  # f: GPS Lon (zmienna po wietrze)
+            self.altitude,  # f: GPS Alt
+            0b00000000,  # B: GPIO State (zgodnie z rozpiską)
             int(self.voltage * 100),  # H: Napięcie [1/100 V]
-            abs(random.randint(-85, -60)), # B: RSSI (uint8)
-            b'\n\r\0'                 # 3s: zakończenie
+            abs(random.randint(-85, -60)),  # B: RSSI (uint8)
+            b'\n\r\0'  # 3s: zakończenie
         )
         return frame
 
@@ -110,6 +127,7 @@ class RocketSimulator:
 
                 self.ser.write(frame_bytes)
 
+                # Symulacja zerwanego pakietu co ~50 ramek
                 if frame_count % 50 == 0:
                     time.sleep(0.1)
 
@@ -119,6 +137,7 @@ class RocketSimulator:
                 print("\n🛑 Simulator stopped.")
                 break
 
+
 if __name__ == "__main__":
-    sim = RocketSimulator(port='/dev/ttys003')
+    sim = RocketSimulator(port='/dev/ttys004')
     sim.run()
