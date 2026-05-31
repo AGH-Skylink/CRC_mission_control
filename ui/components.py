@@ -167,6 +167,10 @@ class GPSManager:
     def update(self, lat: float, lon: float, fix: int):
         if fix > 0 and lat != 0.0 and lon != 0.0:
 
+            if self.lats and (abs(self.lats[-1] - lat) > 0.01 or abs(self.lons[-1] - lon) > 0.01):
+                self.lats.clear()
+                self.lons.clear()
+
             if not self.lats or (abs(self.lats[-1] - lat) > 1e-6 or abs(self.lons[-1] - lon) > 1e-6):
                 self.lats.append(lat)
                 self.lons.append(lon)
