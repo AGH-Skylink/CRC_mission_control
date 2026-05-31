@@ -205,13 +205,13 @@ class MissionControlLayout:
                         dpg.add_spacer(height=10)
                         with dpg.group(horizontal=True):
                             dpg.add_text("Sequences", indent=250)
-                            dpg.add_combo(items=[], width=300)
+                            dpg.add_combo(items=[], width=300, tag="seq_combo")
                             dpg.add_button(label="NEW", width=80)
                             dpg.add_button(label="EDIT", width=80)
-                            dpg.add_button(label="SEND", width=80)
+                            dpg.add_button(label="SEND", width=80, tag="seq_send_btn")
                         dpg.add_spacer(height=20)
-                        dpg.add_text("NO VALID SEQUENCE AVAILABLE\nPLEASE CHANGE THE HARDWARE CONFIG",
-                                     color=theme.TEXT_NORMAL, indent=450)
+                        dpg.add_text("Select a sequence from the dropdown to preview...",
+                                     color=theme.TEXT_NORMAL, indent=450, tag="seq_preview_text")
 
                     # KARTA: LOGGER
                     with dpg.tab(label="LOGGER"):
@@ -300,6 +300,19 @@ class MissionControlLayout:
                         for btn in [arm_btn, disarm_btn, reset_btn, buzzer_test_btn, servo_test_btn, deploy_btn,
                                     abort_btn]:
                             dpg.bind_item_theme(btn, action_theme)
+
+            # --- 4. OKNA WYSKAKUJĄCE (POPUPS) ---
+            with dpg.window(label="Mission Control Settings", tag="settings_window", show=False,
+                            width=400, height=250, modal=True, no_collapse=True, no_move=True):
+                dpg.add_text("COMMUNICATION", color=theme.ACCENT_PRIMARY)
+                dpg.add_combo(label="Baudrate", items=["9600", "57600", "115200", "921600"],
+                              default_value="115200", width=150, tag="stg_baudrate")
+                dpg.add_spacer(height=15)
+                dpg.add_text("LOGGING", color=theme.ACCENT_PRIMARY)
+                dpg.add_text("Directory: ./logs", color=theme.TEXT_NORMAL)
+                dpg.add_spacer(height=20)
+                dpg.add_button(label="CLOSE", width=100,
+                               callback=lambda: dpg.configure_item("settings_window", show=False))
 
 
     def update_led(self, tag, color):

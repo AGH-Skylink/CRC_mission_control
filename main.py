@@ -61,6 +61,12 @@ class MissionControlApp:
             "cmd_autoscroll_check"
         )
 
+        self.sequences = {
+            "Pre-flight Hardware Test": [("ARM", 1.0), ("TEST_BUZZER", 2.0), ("TEST_SERVOS", 2.0), ("DISARM", 0.0)],
+            "Abort & Safing Procedure": [("ABORT", 0.5), ("DISARM", 0.0)],
+            "Full Recovery Test": [("ARM", 0.5), ("DEPLOY_CHUTE", 3.0), ("DISARM", 0.0)]
+        }
+
         self.logger.add_ui_handler(self.terminal.append)
 
         dpg.configure_item("scan_btn", callback=self._on_scan)
@@ -82,6 +88,11 @@ class MissionControlApp:
         dpg.configure_item("disarm_btn", callback=lambda: self._send_cmd("DISARM"))
         dpg.configure_item("reset_btn", callback=lambda: self._send_cmd("RESET"))
         dpg.configure_item("abort_btn", callback=lambda: self._send_cmd("ABORT"))
+
+        dpg.configure_item("settings_btn", callback=lambda: dpg.configure_item("settings_window", show=True))
+
+        dpg.configure_item("seq_combo", items=list(self.sequences.keys()), callback=self._on_sequence_select)
+        dpg.configure_item("seq_send_btn", callback=self._run_sequence)
 
         dpg.configure_item("deploy_btn", callback=lambda: self._send_cmd("DEPLOY_CHUTE"))
 
@@ -109,8 +120,11 @@ class MissionControlApp:
             self.logger.warning("Disconnected from port")
         else:
             port = dpg.get_value("port_combo")
-            if port and self.serial.connect(port):
-                self.logger.info(f"Connected to {port}")
+            baudrate_str = dpg.get_value("stg_baudrate")
+            baudrate = int(baudrate_str) if baudrate_str else 115200
+
+            if port and self.serial.connect(port, baudrate):
+                self.logger.info(f"Connected to {port} at {baudrate} bps")
             else:
                 self.logger.error("Failed to connect!")
 
@@ -335,6 +349,30 @@ class MissionControlApp:
             dpg.set_value("replay_file_path_text", f"LOADED: {file_name}\nFull path: {file_path}")
             dpg.configure_item("replay_file_path_text", color=theme.STATUS_GREEN)
             self.logger.info(f"Załadowano plik repliki lotu: {file_name}")
+
+    def _on_sequence_select(self, sender, app_data):
+        seq_name = app_data
+        if seq_name in self.sequences:
+            steps_text = f"Sequence steps for '{seq_name}':\n"
+            for cmd, delay in self.sequences[seq_name]:
+                steps_text += f" > {cmd} (wait {delay}s)\n"
+            dpg.set_value("seq_preview_text", steps_text)
+
+    def _run_sequence(self):
+        seq_name = dpg.get_value("seq_combo")
+        if not seq_name or seq_name not in self.sequences:
+            self.logger.warning("No valid sequence selected.")
+            return
+
+        def execute_macro():
+            self.logger.info(f"STARTING MACRO: {seq_name}")
+            for cmd, delay in self.sequences[seq_name]:
+                self._send_cmd(cmd)
+                time.sleep(delay)
+            self.logger.info(f"MACRO FINISHED: {seq_name}")
+
+        import threading
+        threading.Thread(target=execute_macro, daemon=True).start()
 
 
 if __name__ == "__main__":
