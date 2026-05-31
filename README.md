@@ -10,31 +10,31 @@
 
 ---
 
-## 🚀 Overview
+## Overview
 Mission Control acts as the central hub between the flight computer and mission operators. By utilizing **DearPyGui**, it delivers an ultra-responsive, GPU-accelerated interface capable of rendering complex flight data and 3D orientation in real-time without straining system resources.
 
-## ✨ Key Features
+## Key Features
 
-### 📡 Real-Time Telemetry & Monitoring
+### Real-Time Telemetry & Monitoring
 * **High-Frequency Data Parsing**: Efficiently decodes 50-byte binary telemetry frames using custom struct packing.
 * **Live Status Dashboard**: Monitors critical flight parameters: altitude, temperature, battery voltage, and RSSI with intelligent alert thresholds.
 * **Connection Health**: Advanced Link Quality monitoring with automated detection of dropped frames and signal loss.
 
-### 🧭 Advanced Flight Visualization
+### Advanced Flight Visualization
 * **Custom Navball Widget**: A high-fidelity, GPU-drawn attitude indicator showing real-time Pitch, Roll, and Yaw.
 * **Trajectory Tracking**: Live map and path visualization using integrated graphing tools to track flight descent and landing recovery.
 
-### 🛠️ Command & Control
+### Command & Control
 * **Macro Sequence Engine**: Easily configure and execute automated pre-flight, launch, and abort procedures.
 * **Hardware Interface**: Dedicated control panels for monitoring sensors (IMU, Barometer) and testing pyrotechnic recovery hardware.
 
-### 💾 Data Integrity & Analysis
+### Data Integrity & Analysis
 * **Triple-Layer Logging**: Simultaneous logging of system events, CSV-formatted telemetry data, and raw binary frames for post-flight analysis.
 * **Flight Replayer**: Integrated tools to load and replay mission logs, allowing for "what-if" analysis and debriefing.
 
 ---
 
-## 🏗️ Technical Architecture
+## Technical Architecture
 
 The application follows a modular architecture designed for maintainability and scalability:
 
@@ -44,7 +44,7 @@ The application follows a modular architecture designed for maintainability and 
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 * Python 3.10+
