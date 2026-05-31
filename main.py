@@ -182,6 +182,8 @@ class MissionControlApp:
                     FlightDataDisplays.update_state(frame.state)
                     FlightDataDisplays.update_metrics(frame.altitude, frame.voltage, frame.temp)
 
+                    FlightDataDisplays.update_hardware_tab(frame)
+
                     if self.payload_mgr:
                         self.payload_mgr.update(frame.temp, 0.0)
 

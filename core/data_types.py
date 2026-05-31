@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 from enum import Enum, IntEnum
-from typing import Tuple
 
 
 class MissionState(IntEnum):
@@ -41,6 +40,12 @@ class TelemetryFrame:
     gyro: Vector3 = field(default_factory=Vector3)
     mag: Vector3 = field(default_factory=Vector3)
 
+    gps_fix: int = 0
+    gps_sats: int = 0
+    gps_lat: float = 0.0
+    gps_lon: float = 0.0
+    gps_alt: float = 0.0
+
     gpio_state: int = 0
     voltage: float = 0.0
     rssi: int = 0
@@ -51,3 +56,27 @@ class TelemetryFrame:
 
     last_update: float = field(default_factory=lambda: 0.0)
     dropped_frames: int = 0
+
+    @property
+    def pyro1(self) -> bool: return bool(self.gpio_state & (1 << 0))
+
+    @property
+    def pyro2(self) -> bool: return bool(self.gpio_state & (1 << 1))
+
+    @property
+    def led_r(self) -> bool: return bool(self.gpio_state & (1 << 2))
+
+    @property
+    def led_g(self) -> bool: return bool(self.gpio_state & (1 << 3))
+
+    @property
+    def led_b(self) -> bool: return bool(self.gpio_state & (1 << 4))
+
+    @property
+    def buzzer(self) -> bool: return bool(self.gpio_state & (1 << 5))
+
+    @property
+    def camera(self) -> bool: return bool(self.gpio_state & (1 << 6))
+
+    @property
+    def breakaway_wire(self) -> bool: return bool(self.gpio_state & (1 << 7))

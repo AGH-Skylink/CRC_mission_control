@@ -109,42 +109,72 @@ class MissionControlLayout:
 
                             dpg.add_spacer(height=10)
                             with dpg.group(horizontal=True):
-                                panel_w, panel_h = 125, 220
+                                panel_w, panel_h = 125, 230
 
-                                # Panele sensorów
+                                # 1. Panel IMU (Akcelerometr i Żyroskop)
                                 with dpg.child_window(width=panel_w, height=panel_h, border=True):
                                     dpg.add_text("IMU_MPU9250", color=theme.TEXT_NORMAL)
+                                    dpg.add_separator()
+                                    dpg.add_text("ACC X: --", tag="hw_acc_x")
+                                    dpg.add_text("ACC Y: --", tag="hw_acc_y")
+                                    dpg.add_text("ACC Z: --", tag="hw_acc_z")
+                                    dpg.add_spacer(height=5)
+                                    dpg.add_text("GYR X: --", tag="hw_gyr_x")
+                                    dpg.add_text("GYR Y: --", tag="hw_gyr_y")
+                                    dpg.add_text("GYR Z: --", tag="hw_gyr_z")
+
+                                # 2. Panel Barometru
                                 with dpg.child_window(width=panel_w, height=panel_h, border=True):
                                     dpg.add_text("BARO_BMP280", color=theme.TEXT_NORMAL)
-                                with dpg.child_window(width=panel_w, height=panel_h, border=True):
-                                    dpg.add_text("GPS_GP02", color=theme.TEXT_NORMAL)
-                                with dpg.child_window(width=panel_w, height=panel_h, border=True):
-                                    dpg.add_text("BODY_STRESS", color=theme.TEXT_NORMAL)
+                                    dpg.add_separator()
+                                    dpg.add_text("ALT: -- m", tag="hw_baro_alt")
+                                    dpg.add_text("TEMP: -- °C", tag="hw_baro_temp")
 
-                                # Kontrola mechanizmów
+                                # 3. Panel GPS
+                                with dpg.child_window(width=panel_w + 15, height=panel_h, border=True):
+                                    dpg.add_text("GPS_GP02", color=theme.TEXT_NORMAL)
+                                    dpg.add_separator()
+                                    dpg.add_text("FIX: --", tag="hw_gps_fix")
+                                    dpg.add_text("SATS: --", tag="hw_gps_sats")
+                                    dpg.add_text("LAT: --", tag="hw_gps_lat")
+                                    dpg.add_text("LON: --", tag="hw_gps_lon")
+                                    dpg.add_text("G_ALT: -- m", tag="hw_gps_alt")
+
+                                # 4. Zastąpiony panel BODY_STRESS -> BREAKAWAY WIRE
+                                with dpg.child_window(width=panel_w, height=panel_h, border=True):
+                                    dpg.add_text("BREAKAWAY", color=theme.TEXT_NORMAL)
+                                    dpg.add_separator()
+                                    dpg.add_text("WIRE: --", tag="hw_breakaway")
+
+                                # 5. Kontrola mechanizmów (Lotki aerodynamiczne)
                                 with dpg.child_window(width=panel_w, height=panel_h, border=True):
                                     dpg.add_text("AERO_FINS", color=theme.TEXT_NORMAL)
-                                    dpg.add_spacer(height=20)
+                                    dpg.add_spacer(height=10)
                                     dpg.add_text("0", indent=55)
                                     dpg.add_input_text(width=-1, default_value="--")
                                     dpg.add_button(label="SET", width=-1)
-                                    dpg.add_spacer(height=10)
+                                    dpg.add_spacer(height=5)
                                     dpg.add_button(label="OPEN", width=-1)
                                     dpg.add_button(label="CLOSE", width=-1)
 
+                                # 6. System Odzyskiwania (Spadochrony)
                                 with dpg.child_window(width=panel_w, height=panel_h, border=True):
                                     dpg.add_text("RECOVERY_SYS", color=theme.TEXT_NORMAL)
-                                    dpg.add_text("ARMED", color=theme.TEXT_NORMAL)
-                                    dpg.add_spacer(height=30)
+                                    dpg.add_separator()
+                                    dpg.add_text("PYRO1: OFF", tag="hw_pyro1")
+                                    dpg.add_text("PYRO2: OFF", tag="hw_pyro2")
+                                    dpg.add_spacer(height=25)
                                     dpg.add_button(label="ARM", width=-1)
                                     dpg.add_button(label="DISARM", width=-1)
 
+                                # 7. Zasilanie i parametry sygnału radiowego
                                 with dpg.child_window(width=panel_w, height=panel_h, border=True):
                                     dpg.add_text("BATTERY", color=theme.TEXT_NORMAL)
-                                    dpg.add_spacer(height=50)
-                                    dpg.add_button(label="OPEN", width=-1)
-                                    dpg.add_button(label="CLOSE", width=-1)
+                                    dpg.add_separator()
+                                    dpg.add_text("VOLT: -- V", tag="hw_bat_volt")
+                                    dpg.add_text("RSSI: -- dBm", tag="hw_rssi")
 
+                                # 8. Karta SD Loggera pokładowego
                                 with dpg.child_window(width=panel_w, height=panel_h, border=True):
                                     dpg.add_text("SD_LOGGER", color=theme.TEXT_NORMAL)
                                     dpg.add_spacer(height=25)
@@ -152,16 +182,20 @@ class MissionControlLayout:
                                     dpg.add_button(label="STOP", width=-1)
                                     dpg.add_button(label="ERASE", width=-1)
 
+                                # 9. Buzzer i Sygnalizacja LED
                                 with dpg.child_window(width=panel_w, height=panel_h, border=True):
                                     dpg.add_text("BUZZER_LEDS", color=theme.TEXT_NORMAL)
-                                    dpg.add_spacer(height=50)
-                                    dpg.add_button(label="OPEN", width=-1)
-                                    dpg.add_button(label="CLOSE", width=-1)
+                                    dpg.add_separator()
+                                    dpg.add_text("BUZZ: OFF", tag="hw_buzzer")
+                                    dpg.add_text("LED R: OFF", tag="hw_led_r")
+                                    dpg.add_text("LED G: OFF", tag="hw_led_g")
+                                    dpg.add_text("LED B: OFF", tag="hw_led_b")
 
+                                # 10. Harmonogram lotu
                                 with dpg.child_window(width=panel_w + 15, height=panel_h, border=True):
                                     dpg.add_text("FLIGHT_SCHED", color=theme.TEXT_NORMAL)
                                     dpg.add_text("Seq State Unk", color=theme.TEXT_NORMAL, wrap=120)
-                                    dpg.add_spacer(height=10)
+                                    dpg.add_spacer(height=15)
                                     with dpg.group(horizontal=True):
                                         dpg.add_button(label="START", width=60)
                                         dpg.add_button(label="CLEAR", width=60)

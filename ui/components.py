@@ -93,6 +93,48 @@ class FlightDataDisplays:
         except:
             pass
 
+    @staticmethod
+    def update_hardware_tab(frame):
+        try:
+            # IMU MPU9250
+            dpg.set_value("hw_acc_x", f"ACC X: {frame.accel.x:.0f}")
+            dpg.set_value("hw_acc_y", f"ACC Y: {frame.accel.y:.0f}")
+            dpg.set_value("hw_acc_z", f"ACC Z: {frame.accel.z:.0f}")
+            dpg.set_value("hw_gyr_x", f"GYR X: {frame.gyro.x:.0f}")
+            dpg.set_value("hw_gyr_y", f"GYR Y: {frame.gyro.y:.0f}")
+            dpg.set_value("hw_gyr_z", f"GYR Z: {frame.gyro.z:.0f}")
+
+            # BARO BMP280
+            dpg.set_value("hw_baro_alt", f"ALT: {frame.altitude:.1f} m")
+            dpg.set_value("hw_baro_temp", f"TEMP: {frame.temp:.1f} °C")
+
+            # GPS GP02
+            dpg.set_value("hw_gps_fix", f"FIX: {'YES' if frame.gps_fix > 0 else 'NO'}")
+            dpg.set_value("hw_gps_sats", f"SATS: {frame.gps_sats}")
+            dpg.set_value("hw_gps_lat", f"LAT: {frame.gps_lat:.4f}")
+            dpg.set_value("hw_gps_lon", f"LON: {frame.gps_lon:.4f}")
+            dpg.set_value("hw_gps_alt", f"G_ALT: {frame.gps_alt:.1f} m")
+
+            # BREAKAWAY WIRE (Stan pinu GPIO)
+            dpg.set_value("hw_breakaway", f"WIRE: {'OK' if frame.breakaway_wire else 'DISCONNECTED'}")
+
+            # RECOVERY SYSTEM
+            dpg.set_value("hw_pyro1", f"PYRO1: {'FIRE' if frame.pyro1 else 'READY'}")
+            dpg.set_value("hw_pyro2", f"PYRO2: {'FIRE' if frame.pyro2 else 'READY'}")
+
+            # BATTERY & RSSI
+            dpg.set_value("hw_bat_volt", f"VOLT: {frame.voltage:.2f} V")
+            dpg.set_value("hw_rssi", f"RSSI: -{frame.rssi} dBm")
+
+            # BUZZER & LEDS
+            dpg.set_value("hw_buzzer", f"BUZZ: {'ON' if frame.buzzer else 'OFF'}")
+            dpg.set_value("hw_led_r", f"LED R: {'ON' if frame.led_r else 'OFF'}")
+            dpg.set_value("hw_led_g", f"LED G: {'ON' if frame.led_g else 'OFF'}")
+            dpg.set_value("hw_led_b", f"LED B: {'ON' if frame.led_b else 'OFF'}")
+
+        except Exception:
+            pass
+
 
 class PayloadManager:
 

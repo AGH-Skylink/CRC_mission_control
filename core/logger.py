@@ -56,7 +56,8 @@ class MissionLogger:
             "gyr_x", "gyr_y", "gyr_z",
             "mag_x", "mag_y", "mag_z",
             "alt", "temp", "volt", "rssi",
-            "pitch", "roll", "yaw"
+            "pitch", "roll", "yaw",
+            "gps_fix", "gps_sats", "gps_lat", "gps_lon", "gps_alt"
         ]
         with open(self.telemetry_file, 'w', newline='') as f:
             writer = csv.writer(f)
@@ -79,7 +80,12 @@ class MissionLogger:
                     frame.rssi,
                     frame.pitch,
                     frame.roll,
-                    frame.yaw
+                    frame.yaw,
+                    frame.gps_fix,
+                    frame.gps_sats,
+                    frame.gps_lat,
+                    frame.gps_lon,
+                    frame.gps_alt
                 ])
         except Exception as e:
             self.error(f"Krytyczny błąd zapisu telemetrii: {e}")

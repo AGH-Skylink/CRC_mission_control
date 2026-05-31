@@ -73,11 +73,11 @@ class SerialManager:
                         self._bytes_count += len(chunk)
                         sync_buffer.extend(chunk)
 
-                        while len(sync_buffer) >= 58:
-                            if sync_buffer[55:58] == b'\n\r\0':
-                                frame_bytes = sync_buffer[:58]
+                        while len(sync_buffer) >= 50:
+                            if sync_buffer[47:50] == b'\n\r\0':
+                                frame_bytes = sync_buffer[:50]
                                 self.raw_queue.put(frame_bytes)
-                                sync_buffer = sync_buffer[58:]
+                                sync_buffer = sync_buffer[50:]
                             else:
                                 sync_buffer.pop(0)
 

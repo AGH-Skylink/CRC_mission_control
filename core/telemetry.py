@@ -6,21 +6,22 @@ from typing import Optional
 from core.data_types import TelemetryFrame, MissionState, ConnectionStatus, Vector3
 
 class TelemetryParser:
-    # C Struct unpacking format dla 58 bajtów:
-    # <  - Little Endian (standard dla STM32)
-    # B  - 1x uint8 (preambula)
+    # RAMKA (50 bajtów):
+    # <  - Little Endian
+    # B  - 1x uint8 (preambuła)
     # I  - 1x uint32 (timestamp)
     # B, B - 2x uint8 (stan, ost. komenda)
-    # h, h - 2x int16 (wysokość dm, temperatura)
+    # h, h - 2x int16 (wysokość decymetry, temp 1/100 C)
     # 9h - 9x int16 (3x mag, 3x acc, 3x gyro)
-    # 20s - 20 bajtów char (GPS - obecnie śmieci)
-    # B  - 1x uint8 (GPIO)
-    # H  - 1x uint16 (napięcie)
-    # b  - 1x int8 (RSSI)
-    # H  - 1x uint16 (CRC)
-    # 3s - 3 bajty zakonczenia
-    FRAME_FORMAT = "< B I B B h h h h h h h h h h h 20s B H b H 3s"
-    FRAME_SIZE = 58
+    # B, B - 2x uint8 (GPS fix, liczba satelit)
+    # 3f - 3x float (GPS lat, lon, alt)
+    # B  - 1x uint8 (GPIO state)
+    # H  - 1x uint16 (napięcie baterii 1/100 V)
+    # B  - 1x uint8 (RSSI)
+    # 3s - 3 bajty zakończenia (\n\r\0)
+
+    FRAME_FORMAT = "< B I B B h h 9h B B 3f B H B 3s"
+    FRAME_SIZE = 50
 
     def __init__(self):
         self.state = TelemetryFrame()
@@ -42,15 +43,22 @@ class TelemetryParser:
             self.state.last_command = unpacked[3]
 
             self.state.altitude = unpacked[4] / 10.0
-            self.state.temp = unpacked[5]
+            self.state.temp = unpacked[5] / 100.0 # 1/100 st.C
 
             self.state.mag = Vector3(unpacked[6], unpacked[7], unpacked[8])
             self.state.accel = Vector3(unpacked[9], unpacked[10], unpacked[11])
             self.state.gyro = Vector3(unpacked[12], unpacked[13], unpacked[14])
 
-            self.state.gpio_state = unpacked[16]
-            self.state.voltage = unpacked[17] / 1000.0
-            self.state.rssi = unpacked[18]
+            # GPS
+            self.state.gps_fix = unpacked[15]
+            self.state.gps_sats = unpacked[16]
+            self.state.gps_lat = unpacked[17]
+            self.state.gps_lon = unpacked[18]
+            self.state.gps_alt = unpacked[19]
+
+            self.state.gpio_state = unpacked[20]
+            self.state.voltage = unpacked[21] / 100.0
+            self.state.rssi = unpacked[22]
 
             try:
                 new_state = MissionState(stan_raw)
@@ -83,28 +91,21 @@ class TelemetryParser:
         time_since_drop = now - self._last_drop_time
 
         if time_since_last > 2.0:
-            current_status = ConnectionStatus.DISCONNECTED  # BLACK
-
+            current_status = ConnectionStatus.DISCONNECTED
         elif self.state.voltage > 0 and self.state.voltage < 3.4:
-            current_status = ConnectionStatus.ERROR  # RED
-
+            current_status = ConnectionStatus.ERROR
         elif time_since_drop < 1.0:
-            current_status = ConnectionStatus.DROPPED_FRAMES  # YELLOW
-
+            current_status = ConnectionStatus.DROPPED_FRAMES
         else:
-            current_status = ConnectionStatus.CONNECTED  # GREEN
+            current_status = ConnectionStatus.CONNECTED
 
         if current_status != self._prev_conn_status:
             if current_status == ConnectionStatus.DISCONNECTED:
                 self.logger.error(f"UTRATA SYGNAŁU: Brak danych od {time_since_last:.1f}s")
-
             elif current_status == ConnectionStatus.ERROR:
                 self.logger.critical(f"BŁĄD ZASILANIA: Napięcie spadło do {self.state.voltage:.2f}V!")
-
             elif current_status == ConnectionStatus.DROPPED_FRAMES:
-                self.logger.warning(
-                    f"DEGRADACJA LINKU: Wykryto luki w transmisji LoRa (Suma zgubionych: {self.state.dropped_frames})")
-
+                self.logger.warning(f"DEGRADACJA LINKU: Wykryto luki w transmisji LoRa")
             elif current_status == ConnectionStatus.CONNECTED:
                 if self._prev_conn_status in [ConnectionStatus.DISCONNECTED, ConnectionStatus.ERROR]:
                     self.logger.info("POŁĄCZENIE ODZYSKANE: Link telemetrii stabilny")
