@@ -191,14 +191,14 @@ class MissionControlLayout:
                                     dpg.add_text("LED G: OFF", tag="hw_led_g")
                                     dpg.add_text("LED B: OFF", tag="hw_led_b")
 
-                                # 10. Harmonogram lotu
-                                with dpg.child_window(width=panel_w + 15, height=panel_h, border=True):
-                                    dpg.add_text("FLIGHT_SCHED", color=theme.TEXT_NORMAL)
-                                    dpg.add_text("Seq State Unk", color=theme.TEXT_NORMAL, wrap=120)
-                                    dpg.add_spacer(height=15)
-                                    with dpg.group(horizontal=True):
-                                        dpg.add_button(label="START", width=60)
-                                        dpg.add_button(label="CLEAR", width=60)
+                                # # 10. Harmonogram lotu
+                                # with dpg.child_window(width=panel_w + 15, height=panel_h, border=True):
+                                #     dpg.add_text("FLIGHT_SCHED", color=theme.TEXT_NORMAL)
+                                #     dpg.add_text("Seq State Unk", color=theme.TEXT_NORMAL, wrap=120)
+                                #     dpg.add_spacer(height=15)
+                                #     with dpg.group(horizontal=True):
+                                #         dpg.add_button(label="START", width=60, tag="sched_start_btn")
+                                #         dpg.add_button(label="CLEAR", width=60, tag="sched_clear_btn")
 
                     # KARTA: SEQUENCES
                     with dpg.tab(label="SEQUENCES"):

@@ -85,6 +85,9 @@ class MissionControlApp:
 
         dpg.configure_item("deploy_btn", callback=lambda: self._send_cmd("DEPLOY_CHUTE"))
 
+        # dpg.configure_item("sched_start_btn", callback=lambda: self._send_cmd("START_SEQ"))
+        # dpg.configure_item("sched_clear_btn", callback=lambda: self._send_cmd("CLEAR_SEQ"))
+
         dpg.configure_item("buzzer_test_btn", callback=lambda: self._send_cmd("TEST_BUZZER"))
         dpg.configure_item("servo_test_btn", callback=lambda: self._send_cmd("TEST_SERVOS"))
 

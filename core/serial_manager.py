@@ -24,7 +24,17 @@ class SerialManager:
         self._last_stat_time = time.time()
 
     def scan_ports(self):
-        ports = [port.device for port in serial.tools.list_ports.comports()]
+        ports = []
+
+        for port in serial.tools.list_ports.comports():
+            desc = (port.description or "").lower()
+            hwid = (port.hwid or "").lower()
+            device = (port.device or "").lower()
+
+            is_bluetooth = "bluetooth" in desc or "bluetooth" in hwid or "bth" in hwid or "bluetooth" in device
+
+            if not is_bluetooth:
+                ports.append(port.device)
 
         if sys.platform.startswith('darwin'):
             virtual_ptys = glob.glob('/dev/ttys[0-9][0-9][0-9]')
