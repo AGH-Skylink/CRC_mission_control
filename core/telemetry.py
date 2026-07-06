@@ -42,8 +42,8 @@ class TelemetryParser:
             stan_raw = unpacked[2]
             self.state.last_command = unpacked[3]
 
-            self.state.altitude = unpacked[4] / 10.0
-            self.state.temp = unpacked[5] / 100.0 # 1/100 st.C
+            self.state.altitude = unpacked[4] / 1000.0
+            self.state.temp = unpacked[5] / 1000.0 # 1/100 st.C
 
             self.state.mag = Vector3(unpacked[6], unpacked[7], unpacked[8])
             self.state.accel = Vector3(unpacked[9], unpacked[10], unpacked[11])
@@ -57,7 +57,7 @@ class TelemetryParser:
             self.state.gps_alt = unpacked[19]
 
             self.state.gpio_state = unpacked[20]
-            self.state.voltage = unpacked[21] / 100.0
+            self.state.voltage = unpacked[21] / 20000.0
             self.state.rssi = unpacked[22]
 
             try:
