@@ -164,7 +164,15 @@ class AccelVectorWidget:
         # prostopadly do ziemi i przechodzi przez os symetrii rakiety, czyli
         # akcelerometr-X - dlatego to ax musi sterowac pionowa osia widgetu,
         # a nie ay (mimo ze ta os na ekranie zawsze nazywa sie "Y").
-        tip = self._iso_project(ay * k, ax * k, az * k)
+        #
+        # NOSE_SIGN = -1.0: plytka jest w rakiecie zamontowana "do gory
+        # nogami" (obrocona o 180 stopni wzgledem pierwotnego zalozenia),
+        # wiec dodatnie surowe ax odpowiada dziobowi w DOL, nie w gore.
+        # Odwracamy znak tak samo jak przy liczeniu pitch w
+        # core/telemetry.py (TelemetryParser.ACCEL_NOSE_SIGN) - trzymaj te
+        # dwie stale zgodne, jesli montaz plytki sie zmieni.
+        NOSE_SIGN = -1.0
+        tip = self._iso_project(ay * k, (NOSE_SIGN * ax) * k, az * k)
 
         dpg.configure_item(self.vector_tag, p1=origin, p2=tip)
         dpg.configure_item(self.tip_dot_tag, center=tip)

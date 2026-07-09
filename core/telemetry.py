@@ -42,6 +42,13 @@ class TelemetryParser:
     FRAME_SIZE = 50
     PREAMBLE = 0x24  # '$'
 
+    # Znak osi X akcelerometru (dziob rakiety) - patrz duzy komentarz przy
+    # liczeniu pitch w parse_frame(). Plytka jest zamontowana "do gory
+    # nogami" (obrocona o 180 stopni) wzgledem pierwotnego zalozenia, wiec
+    # odwracamy znak, zeby dziob-w-gore = pitch +90. Jedyne miejsce do
+    # zmiany, gdyby montaz plytki znowu sie zmienil.
+    ACCEL_NOSE_SIGN = -1.0
+
     # Wysokosc w ramce jest liczona przez firmware wzgledem cisnienia
     # referencyjnego skalibrowanego PRZY WLACZENIU urzadzenia na ziemi
     # (patrz FlightComputer.c: pressure_reference), a NIE wzgledem poziomu
@@ -63,6 +70,7 @@ class TelemetryParser:
         self._prev_conn_status = ConnectionStatus.DISCONNECTED
         self._last_drop_time = 0
         self._altitude_baseline_raw = None  # ustawiane na 1. odebranej ramce
+        self._orientation_baseline = None   # (pitch_bias_deg, roll_bias_deg), ustawiane na 1. ramce
 
     def reset_altitude_baseline(self):
         """Wyzeruj punkt odniesienia wysokosci - kolejna odebrana ramka
@@ -71,6 +79,25 @@ class TelemetryParser:
         sesji zawsze startowala od 0, a nie od starego punktu zerowego z
         poprzedniego polaczenia."""
         self._altitude_baseline_raw = None
+
+    def reset_orientation_baseline(self):
+        """Wyzeruj kalibracje orientacji (pitch/roll) - kolejna odebrana
+        ramka stanie sie nowym punktem odniesienia 'rakieta stoi idealnie
+        pionowo, bez przechylu' (pitch=+90, roll=0).
+
+        PO CO: akcelerometr nigdy nie da idealnie czystego odczytu z jedna
+        skladowa (np. a=(285,-17,24) zamiast (285,0,0)) - male ay/az to nie
+        tylko szum, ale przede wszystkim STALE niedopasowanie montazu
+        czujnika w rakiecie. Bez kalibracji navball pokazywalby wiec zawsze
+        odrobine niedokladny odczyt (np. pitch~84 zamiast 90) nawet gdy
+        rakieta fizycznie stoi idealnie pionowo.
+
+        ZALOZENIE (jak przy zerowaniu wysokosci): operator laczy sie z
+        rakieta W MOMENCIE, gdy stoi ona pionowo na wyrzutni, gotowa do
+        lotu - dokladnie tak samo jak zerowanie baroametru zaklada start z
+        ziemi. Wywolywane automatycznie przy kazdym otwarciu portu
+        (main.py: _on_connect)."""
+        self._orientation_baseline = None
 
     def parse_frame(self, frame_bytes: bytes) -> Optional[TelemetryFrame]:
         if len(frame_bytes) != self.FRAME_SIZE:
@@ -161,9 +188,62 @@ class TelemetryParser:
                 self.state.state = new_state
             except ValueError:
                 pass
+
+            # --- Orientacja (pitch/roll) z akcelerometru ---
+            #
+            # Uklad IMU w rakiecie: os X akcelerometru pokrywa sie z DLUGA
+            # OSIA RAKIETY (dziob/silnik) - potwierdzone empirycznie: rakieta
+            # stojaca pionowo na wyrzutni, gotowa do lotu, ma wektor
+            # grawitacji prostopadly do ziemi i przechodzacy przez jej os
+            # symetrii - czyli dokladnie przez os X akcelerometru. Odczyt w
+            # tej pozycji jest wiec zdominowany przez skladowa X
+            # (np. a=(285,-17,24)), a Y/Z sa bliskie zeru.
+            #
+            # PITCH = kat wychylenia dziobu od poziomu (-90..+90). Poprzednia
+            # wersja liczyla go jako atan2(-ax, ...), co dla rakiety stojacej
+            # pionowo (dziob w gore, ax dodatnie i duze) dawalo pitch ~ -90
+            # stopni - navball pokazywal wtedy niemal sama "ziemie" z waskim
+            # paskiem nieba, czyli odwrotnie niz powinno byc (dziob w gore =
+            # navball ma pokazywac niemal samo "niebo"). Usunieto minus, zeby
+            # dziob-w-gore = pitch +90 stopni.
+            #
+            # ROLL = obrot wokol dlugiej osi rakiety (X). Fizycznie
+            # akcelerometr NIE JEST W STANIE zmierzyc tego obrotu, gdy
+            # rakieta stoi (prawie) pionowo, bo wtedy wektor grawitacji lezy
+            # WZDLUZ osi obrotu (X) - skladowe Y/Z, z ktorych liczylby sie
+            # roll (atan2(ay,az)), sa wtedy bliskie zeru i zdominowane przez
+            # SZUM CZUJNIKA (nie przez prawdziwy przechyl), co dawalo losowo
+            # "skaczacy" roll (przekrzywiona drabinka na navballu mimo ze
+            # rakieta stoi nieruchomo).
+            #
+            # Pierwsza wersja tej poprawki mrozila roll ponizej progu 15
+            # (surowych jednostek) - okazalo sie za nisko: sam szum czujnika
+            # w pionie daje odczyty rzedu ~30 (np. ay=-17, az=24 -> |29.4|),
+            # czyli WYZEJ niz ten prog, wiec roll byl mimo wszystko liczony
+            # z czystego szumu i "przekrzywial" navball. Teraz:
+            #   1) prog jest wyzej (45) i jest gorna granica pelnego zaufania
+            #      (90), miedzy nimi roll plynnie zanika do 0 zamiast
+            #      przelaczac sie skokowo,
+            #   2) ponizej progu roll DAZY DO ZERA (nie zamraza sie na
+            #      przypadkowej, poprzedniej wartosci - "brak wiarygodnych
+            #      danych" == zakladamy brak przechylu, a nie "cokolwiek
+            #      bylo ostatnio"),
+            #   3) dodatkowe wygladzanie w czasie (low-pass), zeby nawet w
+            #      strefie pelnego zaufania odczyt nie skakal klatka po
+            #      klatce przez szum czujnika.
+            # UWAGA - fizyczny montaz plytki: plytka jest w rakiecie
+            # zamontowana "do gory nogami" wzgledem tego, co pierwotnie
+            # zalozylismy (obrocona o 180 stopni) - w efekcie os X
+            # akcelerometru dalej pokrywa sie z dluga osia rakiety, ale ma
+            # PRZECIWNY zwrot: dodatnie surowe ax odpowiada teraz dziobowi
+            # w DOL, nie w gore. TelemetryParser.ACCEL_NOSE_SIGN odwraca ten
+            # znak PRZED liczeniem pitch, zeby dziob-w-gore nadal dawal
+            # pitch +90 (jak w komentarzu ponizej). Jesli plytke kiedys
+            # zamontujecie z powrotem "jak nalezy", wystarczy zmienic ten
+            # jeden znak na +1.0.
             acc = self.state.accel
-            pitch_rad = math.atan2(acc.x, math.sqrt(acc.y ** 2 + acc.z ** 2 + 1e-6))
-            self.state.pitch = math.degrees(pitch_rad)
+            nose_accel = self.ACCEL_NOSE_SIGN * acc.x
+            raw_pitch_deg = math.degrees(math.atan2(nose_accel, math.sqrt(acc.y ** 2 + acc.z ** 2 + 1e-6)))
 
             ROLL_NO_CONFIDENCE_RAW = 45.0   # ponizej tego roll = szum -> dazy do 0
             ROLL_FULL_CONFIDENCE_RAW = 90.0  # powyzej tego ufamy odczytowi w 100%
@@ -171,6 +251,25 @@ class TelemetryParser:
 
             horizontal_mag = math.sqrt(acc.y ** 2 + acc.z ** 2)
             raw_roll_deg = math.degrees(math.atan2(acc.y, acc.z + 1e-6))
+
+            # Kalibracja zera (patrz reset_orientation_baseline): pierwsza
+            # ramka po polaczeniu ustala, ile trzeba dodac do surowego
+            # pitch/roll, zeby ta ramka odczytala sie jako "idealnie
+            # pionowo, bez przechylu" (pitch=+90, roll=0). Kazda kolejna
+            # ramka dostaje ten sam offset - kompensuje to stale
+            # niedopasowanie montazu czujnika (np. a=(285,-17,24) zamiast
+            # (285,0,0)), a nie tylko przypadkowy szum pojedynczego odczytu.
+            if self._orientation_baseline is None:
+                pitch_bias = 90.0 - raw_pitch_deg
+                roll_bias = 0.0 - raw_roll_deg
+                self._orientation_baseline = (pitch_bias, roll_bias)
+
+            pitch_bias, roll_bias = self._orientation_baseline
+
+            calibrated_pitch = max(-90.0, min(90.0, raw_pitch_deg + pitch_bias))
+            self.state.pitch = calibrated_pitch
+
+            calibrated_roll_raw = raw_roll_deg + roll_bias
 
             if horizontal_mag <= ROLL_NO_CONFIDENCE_RAW:
                 confidence = 0.0
@@ -181,7 +280,7 @@ class TelemetryParser:
                     ROLL_FULL_CONFIDENCE_RAW - ROLL_NO_CONFIDENCE_RAW
                 )
 
-            target_roll_deg = confidence * raw_roll_deg  # dazy do 0 przy niskiej pewnosci
+            target_roll_deg = confidence * calibrated_roll_raw  # dazy do 0 przy niskiej pewnosci
             self.state.roll += ROLL_SMOOTHING * (target_roll_deg - self.state.roll)
 
             self.state.yaw = 0.0
