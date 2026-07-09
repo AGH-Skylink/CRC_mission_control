@@ -100,9 +100,6 @@ class MissionControlApp:
 
         dpg.configure_item("deploy_btn", callback=lambda: self._send_cmd("DEPLOY_CHUTE"))
 
-        # Szybkie komendy w zakladce FLIGHT - te same nazwy/kody co przyciski
-        # w zakladce COMMUNICATION, tylko zdublowane tam gdzie wygodniej je
-        # miec pod reka podczas obserwowania telemetrii lotu.
         dpg.configure_item("flight_cmd_arm_btn", callback=lambda: self._send_cmd("ARM"))
         dpg.configure_item("flight_cmd_disarm_btn", callback=lambda: self._send_cmd("DISARM"))
         dpg.configure_item("flight_cmd_reset_btn", callback=lambda: self._send_cmd("RESET"))
@@ -131,10 +128,6 @@ class MissionControlApp:
         self.logger.info(f"Scanned ports: {ports}")
 
     def _reset_charts(self):
-        """Czysci wszystkie wykresy (payload temp, altitude/flight, GPS
-        trajektoria) - wywolywane przy kazdym nowym OPEN portu, zeby nowa
-        sesja/lot nie mieszala danych ze starym przebiegiem narysowanym na
-        tych samych osiach."""
         if self.payload_mgr:
             self.payload_mgr.reset()
         if self.flight_mgr:
@@ -154,17 +147,7 @@ class MissionControlApp:
 
             if port and self.serial.connect(port, baudrate):
                 self.logger.info(f"Connected to {port} at {baudrate} bps")
-                # Nowe otwarcie portu = nowa sesja odczytow barometru.
-                # Zerujemy baseline wysokosci, zeby PIERWSZA ramka odebrana
-                # po tym polaczeniu (a nie jakas stara z poprzedniej sesji)
-                # stala sie nowym punktem odniesienia "0 m". Bez tego
-                # reconnect w trakcie tej samej sesji aplikacji zostawilby
-                # stary, nieaktualny punkt zerowy z pierwszego polaczenia.
                 self.parser.reset_altitude_baseline()
-                # Kazde nowe OPEN|CLOSE = swiezy start wszystkich wykresow
-                # (temperatura payloadu, wysokosc/lot, trajektoria GPS) -
-                # stare przebiegi z poprzedniej sesji nie powinny zostawac
-                # narysowane razem z nowymi danymi.
                 self._reset_charts()
             else:
                 self.logger.error("Failed to connect!")
@@ -179,10 +162,6 @@ class MissionControlApp:
         dpg.focus_item("cmd_input")
 
     def _send_cmd(self, cmd):
-        # Firmware GS (FlightComputer_handleCommand) czyta DOKLADNIE 1
-        # surowy bajt (LoRa_receive(...,1)), nie tekst - wiec tlumaczymy
-        # nazwe komendy na jej kod (patrz core/commands.py, zgodny 1:1 ze
-        # switchem w FlightComputer.c) i wysylamy pojedynczy bajt.
         code, warning = resolve_command_code(cmd)
 
         if code is None:
@@ -257,15 +236,6 @@ class MissionControlApp:
                         self.payload_mgr.update(frame.temp, 0.0)
 
                     if self.flight_mgr:
-                        # Wykres wysokosci ma STALE osie 0-100s / 0-700m
-                        # (patrz ui/layout.py) skalibrowane pod czas TRWANIA
-                        # LOTU, a nie pod czas dzialania aplikacji. Bez tego
-                        # resetu zegar FlightManager liczylby od uruchomienia
-                        # Mission Control (SCAN/CONNECT moga zajac >100s),
-                        # wiec punkty ladowalyby poza widocznym zakresem osi
-                        # X i wykres wygladalby na pusty mimo poprawnych
-                        # danych. Resetujemy zegar w momencie wykrycia startu
-                        # (przejscie z IDLE na dowolny inny stan).
                         if self._prev_flight_mission_state == MissionState.IDLE and frame.state != MissionState.IDLE:
                             self.flight_mgr.reset()
                         self._prev_flight_mission_state = frame.state

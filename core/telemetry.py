@@ -41,7 +41,8 @@ class TelemetryParser:
 
     FRAME_SIZE = 50
     PREAMBLE = 0x24  # '$'
-    ACCEL_NOSE_SIGN = -1.0
+
+    ACCEL_NOSE_SIGN = 1.0
 
     def __init__(self):
         self.state = TelemetryFrame()
@@ -51,13 +52,9 @@ class TelemetryParser:
         self._prev_conn_status = ConnectionStatus.DISCONNECTED
         self._last_drop_time = 0
         self._altitude_baseline_raw = None  # ustawiane na 1. odebranej ramce
-        self._orientation_baseline = None   # (pitch_bias_deg, roll_bias_deg), ustawiane na 1. ramce
 
     def reset_altitude_baseline(self):
         self._altitude_baseline_raw = None
-
-    def reset_orientation_baseline(self):
-        self._orientation_baseline = None
 
     def parse_frame(self, frame_bytes: bytes) -> Optional[TelemetryFrame]:
         if len(frame_bytes) != self.FRAME_SIZE:
@@ -93,7 +90,7 @@ class TelemetryParser:
             self.state.timestamp_ms = timestamp
             self.state.last_command = last_command
 
-            altitude_relative_m = altitude_raw / 10.0   # decymetry -> metry (wzgledem kalibracji GS)
+            altitude_relative_m = altitude_raw / 10.0
 
             if self._altitude_baseline_raw is None:
                 self._altitude_baseline_raw = altitude_relative_m
@@ -107,7 +104,6 @@ class TelemetryParser:
             self.state.accel = Vector3(ax, ay, az)
             self.state.gyro = Vector3(gx, gy, gz)
 
-            # GPS
             self.state.gps_fix = gps_fix
             self.state.gps_sats = gps_sats
             self.state.gps_lat = gps_lat
@@ -131,7 +127,9 @@ class TelemetryParser:
 
             acc = self.state.accel
             nose_accel = self.ACCEL_NOSE_SIGN * acc.x
-            raw_pitch_deg = math.degrees(math.atan2(nose_accel, math.sqrt(acc.y ** 2 + acc.z ** 2 + 1e-6)))
+            self.state.pitch = math.degrees(
+                math.atan2(nose_accel, math.sqrt(acc.y ** 2 + acc.z ** 2 + 1e-6))
+            )
 
             ROLL_NO_CONFIDENCE_RAW = 45.0   # ponizej tego roll = szum -> dazy do 0
             ROLL_FULL_CONFIDENCE_RAW = 90.0  # powyzej tego ufamy odczytowi w 100%
@@ -139,18 +137,6 @@ class TelemetryParser:
 
             horizontal_mag = math.sqrt(acc.y ** 2 + acc.z ** 2)
             raw_roll_deg = math.degrees(math.atan2(acc.y, acc.z + 1e-6))
-
-            if self._orientation_baseline is None:
-                pitch_bias = 90.0 - raw_pitch_deg
-                roll_bias = 0.0 - raw_roll_deg
-                self._orientation_baseline = (pitch_bias, roll_bias)
-
-            pitch_bias, roll_bias = self._orientation_baseline
-
-            calibrated_pitch = max(-90.0, min(90.0, raw_pitch_deg + pitch_bias))
-            self.state.pitch = calibrated_pitch
-
-            calibrated_roll_raw = raw_roll_deg + roll_bias
 
             if horizontal_mag <= ROLL_NO_CONFIDENCE_RAW:
                 confidence = 0.0
@@ -161,7 +147,7 @@ class TelemetryParser:
                     ROLL_FULL_CONFIDENCE_RAW - ROLL_NO_CONFIDENCE_RAW
                 )
 
-            target_roll_deg = confidence * calibrated_roll_raw  # dazy do 0 przy niskiej pewnosci
+            target_roll_deg = confidence * raw_roll_deg  # dazy do 0 przy niskiej pewnosci
             self.state.roll += ROLL_SMOOTHING * (target_roll_deg - self.state.roll)
 
             self.state.yaw = 0.0

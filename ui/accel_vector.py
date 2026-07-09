@@ -56,7 +56,7 @@ class AccelVectorWidget:
         with dpg.drawlist(width=self.width, height=self.height, parent=parent_tag):
             dpg.draw_rectangle((0, 0), (self.width, self.height), color=theme.COLOR_BLACK, fill=theme.COLOR_BLACK)
 
-            unit_px = self.axis_len
+            unit_px = self.axis_len  # 1 jednostka siatki = dlugosc osi
             self._draw_floor_grid(half_extent_units=2, step_units=1, unit_px=unit_px / 2)
             self._draw_reference_ring(unit_px, theme.ACCENT_TRANS[:3] if len(theme.ACCENT_TRANS) == 4 else theme.ACCENT_TRANS)
             self._draw_reference_ring(unit_px * 2, (50, 50, 50))
@@ -97,7 +97,7 @@ class AccelVectorWidget:
             k = 0.0
 
         origin = self._iso_project(0, 0, 0)
-        NOSE_SIGN = -1.0
+        NOSE_SIGN = 1.0
         tip = self._iso_project(ay * k, (NOSE_SIGN * ax) * k, az * k)
 
         dpg.configure_item(self.vector_tag, p1=origin, p2=tip)
