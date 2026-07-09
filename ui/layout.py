@@ -22,7 +22,7 @@ class MissionControlLayout:
                     dpg.add_button(label="SCAN", width=80, tag="scan_btn")
                     dpg.add_combo(items=[], label="", width=150, tag="port_combo")
                     with dpg.drawlist(width=30, height=30):
-                        dpg.draw_circle((15, 15), 10, color=theme.ACCENT_TRANS, fill=theme.COLOR_BLACK,
+                        dpg.draw_circle((15, 15), 10, color=theme.ACCENT_TRANS, fill=theme.COLOR_BG_DEEP,
                                         tag="main_status_led")
                     dpg.add_button(label="OPEN | CLOSE", width=120, tag="connect_btn")
                     dpg.add_button(label="STG", width=40, tag="settings_btn")
@@ -31,11 +31,11 @@ class MissionControlLayout:
                         with dpg.group(horizontal=True):
                             dpg.add_text("TX", color=theme.TEXT_NORMAL)
                             with dpg.drawlist(width=15, height=15):
-                                dpg.draw_circle((7, 7), 5, fill=theme.COLOR_BLACK, tag="tx_led")
+                                dpg.draw_circle((7, 7), 5, fill=theme.COLOR_BG_DEEP, tag="tx_led")
                         with dpg.group(horizontal=True):
                             dpg.add_text("RX", color=theme.TEXT_NORMAL)
                             with dpg.drawlist(width=15, height=15):
-                                dpg.draw_circle((7, 7), 5, fill=theme.COLOR_BLACK, tag="rx_led")
+                                dpg.draw_circle((7, 7), 5, fill=theme.COLOR_BG_DEEP, tag="rx_led")
 
             dpg.add_separator()
 
@@ -124,22 +124,33 @@ class MissionControlLayout:
                             # core/commands.py (COMMAND_CODES), 1:1 ze
                             # switchem w FlightComputer_handleCommand w
                             # firmware GS. Cyfra w nawiasie = wysylany bajt.
-                            with dpg.child_window(width=-1, height=150, border=True):
+                            with dpg.child_window(width=-1, height=150, border=True, no_scrollbar=True):
                                 dpg.add_text("QUICK COMMANDS (LoRa)", color=theme.ACCENT_PRIMARY)
                                 with dpg.group(horizontal=True):
-                                    dpg.add_button(label="ARM (1)", width=110, tag="flight_cmd_arm_btn")
-                                    dpg.add_button(label="DISARM (2)", width=110, tag="flight_cmd_disarm_btn")
-                                    dpg.add_button(label="RESET (3)", width=110, tag="flight_cmd_reset_btn")
-                                    dpg.add_button(label="ABORT (4)", width=110, tag="flight_cmd_abort_btn")
+                                    arm_q = dpg.add_button(label="ARM (1)", width=110, tag="flight_cmd_arm_btn")
+                                    disarm_q = dpg.add_button(label="DISARM (2)", width=110, tag="flight_cmd_disarm_btn")
+                                    reset_q = dpg.add_button(label="RESET (3)", width=110, tag="flight_cmd_reset_btn")
+                                    abort_q = dpg.add_button(label="ABORT (4)", width=110, tag="flight_cmd_abort_btn")
                                 with dpg.group(horizontal=True):
                                     dpg.add_button(label="CAMERA ON (5)", width=110, tag="flight_cmd_camera_on_btn")
                                     dpg.add_button(label="CAMERA OFF (6)", width=110, tag="flight_cmd_camera_off_btn")
-                                    dpg.add_button(label="DEPLOY CHUTE (7)", width=110, tag="flight_cmd_deploy_btn")
+                                    deploy_q = dpg.add_button(label="DEPLOY CHUTE (7)", width=110, tag="flight_cmd_deploy_btn")
                                     dpg.add_button(label="LAUNCH (8)", width=110, tag="flight_cmd_launch_btn")
                                 dpg.add_text(
                                     "3/4/8 sa zarezerwowane w firmware (jeszcze no-op)",
                                     color=theme.TEXT_NORMAL,
                                 )
+
+                                # Delikatne kolorowanie semantyczne najwazniejszych
+                                # szybkich komend (tylko styl, bez zmiany zawartosci/tagow)
+                                teal_q_theme = theme.create_button_theme(theme.COLOR_TEAL)
+                                red_q_theme = theme.create_button_theme(theme.STATUS_RED)
+                                amber_q_theme = theme.create_button_theme(theme.STATUS_AMBER)
+                                dpg.bind_item_theme(arm_q, teal_q_theme)
+                                dpg.bind_item_theme(disarm_q, amber_q_theme)
+                                dpg.bind_item_theme(reset_q, amber_q_theme)
+                                dpg.bind_item_theme(abort_q, red_q_theme)
+                                dpg.bind_item_theme(deploy_q, amber_q_theme)
 
                         dpg.add_spacer(height=10)
 
@@ -370,7 +381,12 @@ class MissionControlLayout:
 
                 # Pasek Mission Critical
                 with dpg.child_window(height=50, border=False, no_scrollbar=True):
-                    action_theme = theme.create_button_theme(theme.COLOR_TEAL)
+                    # Motywy semantyczne: teal dla bezpiecznych akcji, amber dla
+                    # testow/procedur, czerwony wylacznie dla awaryjnych (DISARM,
+                    # EMERGENCY DEPLOY, ABORT) - tylko kolor, bez zmiany ukladu/tagow.
+                    safe_theme = theme.create_button_theme(theme.COLOR_TEAL)
+                    test_theme = theme.create_button_theme(theme.STATUS_AMBER)
+                    danger_theme = theme.create_button_theme(theme.STATUS_RED)
 
                     with dpg.group(horizontal=True):
                         # Główne kontrolki
@@ -390,10 +406,14 @@ class MissionControlLayout:
                         deploy_btn = dpg.add_button(label="EMERGENCY DEPLOY", width=140, tag="deploy_btn")
                         abort_btn = dpg.add_button(label="ABORT", width=70, tag="abort_btn")
 
-                        # Bindowanie motywów
-                        for btn in [arm_btn, disarm_btn, reset_btn, buzzer_test_btn, servo_test_btn, deploy_btn,
-                                    abort_btn]:
-                            dpg.bind_item_theme(btn, action_theme)
+                        # Bindowanie motywów (tylko kolor per przycisk, reszta bez zmian)
+                        dpg.bind_item_theme(arm_btn, safe_theme)
+                        dpg.bind_item_theme(reset_btn, safe_theme)
+                        dpg.bind_item_theme(buzzer_test_btn, test_theme)
+                        dpg.bind_item_theme(servo_test_btn, test_theme)
+                        dpg.bind_item_theme(disarm_btn, danger_theme)
+                        dpg.bind_item_theme(deploy_btn, danger_theme)
+                        dpg.bind_item_theme(abort_btn, danger_theme)
 
             # --- 4. OKNA WYSKAKUJĄCE (POPUPS) ---
             with dpg.window(label="Mission Control Settings", tag="settings_window", show=False,
