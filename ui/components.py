@@ -155,6 +155,18 @@ class PayloadManager:
         self.temps = deque(maxlen=max_points)
         self.start_time = time.time()
 
+    def reset(self):
+        """Czysci wykres temperatury payloadu i zaczyna liczyc czas od 0 -
+        wywolywane przy kazdym nowym OPEN (polaczeniu z portem), zeby stary
+        przebieg z poprzedniej sesji nie mieszal sie z nowym lotem/testem."""
+        self.times.clear()
+        self.temps.clear()
+        self.start_time = time.time()
+        try:
+            dpg.set_value(self.plot_tag, [[], []])
+        except Exception:
+            pass
+
     def update(self, temp_val, uv_val=0):
         elapsed = time.time() - self.start_time
         self.times.append(elapsed)
@@ -192,8 +204,9 @@ class FlightManager:
         self.start_time = time.time()
 
     def reset(self):
-        """Wyczysc wykres i wznow liczenie czasu od 0 - wywolaj np. przy
-        przejsciu do stanu WAITING/nowego startu."""
+        """Wyczysc wykres i wznow liczenie czasu od 0 - wywoluje sie zarowno
+        przy wykryciu startu lotu (IDLE -> inny stan), jak i przy kazdym
+        nowym OPEN|CLOSE (nowym polaczeniu z portem)."""
         self.times.clear()
         self.altitudes.clear()
         self.start_time = time.time()
@@ -218,6 +231,19 @@ class GPSManager:
     def __init__(self):
         self.lats = []
         self.lons = []
+
+    def reset(self):
+        """Czysci trajektorie GPS (sciezka lotu + aktualna pozycja) -
+        wywolywane przy kazdym nowym OPEN (polaczeniu z portem), zeby stara
+        trasa z poprzedniej sesji nie zostawala narysowana na mapie razem
+        z nowa."""
+        self.lats.clear()
+        self.lons.clear()
+        try:
+            dpg.set_value("gps_path_series", [[], []])
+            dpg.set_value("gps_current_series", [[], []])
+        except Exception:
+            pass
 
     def update(self, lat: float, lon: float, fix: int):
         if fix > 0 and lat != 0.0 and lon != 0.0:

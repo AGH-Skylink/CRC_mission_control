@@ -9,6 +9,18 @@ class AccelVectorWidget:
     wersji nie ma natywnego wykresu 3D, wiec robimy rzut recznie - tak
     samo jak navball.py robi to dla poziomicy.
 
+    WAZNE (oriencja osi): os X akcelerometru pokrywa sie z DLUGA OSIA
+    RAKIETY (patrz core/telemetry.py) - rakieta stojaca pionowo na
+    wyrzutni daje odczyt zdominowany przez skladowa X, a Y/Z sa bliskie
+    zeru. Poprzednia wersja tego widgetu rzutowala akcelerometr 1:1 na
+    lokalne osie rysunku (x->"x" izometrii, y->"y" izometrii), gdzie
+    "y" izometrii to jedyna os pionowa na ekranie - w efekcie dla
+    stojacej pionowo rakiety wektor wychodzil na ukos (bo dominowala
+    skladowa X, rzutowana na przekatna), zamiast prosto w gore. Teraz
+    zamieniamy role osi tak, zeby akcelerometr-X (dziob rakiety) byl
+    rzutowany na PIONOWA os widgetu - dla rakiety stojacej pionowo
+    wektor bedzie wskazywal prosto w gore, tak jak w rzeczywistosci.
+
     Ulepszenia wzgledem pierwszej wersji (dla czytelnosci):
       - siatka "podlogi" (plaszczyzna X-Z) daje poczucie glebi/perspektywy
       - pierscienie odniesienia (1g / 2g) na plaszczyznie podlogi, zeby
@@ -28,8 +40,9 @@ class AccelVectorWidget:
         self.height = height
         self.cx = width / 2
         # Origin przesuniety w dol, zeby zostawic miejsce nad nim na
-        # wektor wskazujacy w gore (typowy przypadek: 1g wzdluz osi Y/Z).
-        self.cy = height * 0.66
+        # wektor wskazujacy w gore (typowy przypadek: rakieta stoi pionowo,
+        # ~1g wzdluz jej dlugiej osi / akcelerometr-X).
+        self.cy = height * 0.7
         # Wieksza skala niz na starcie projektu: wiemy juz z raportu
         # koncowego, ze rakieta ma stosunkowo skromne mozliwosci
         # przyspieszenia (szczyt ~104 m/s^2 / ~10.6g tylko przy starcie
@@ -48,7 +61,10 @@ class AccelVectorWidget:
         self._build_ui(parent_tag)
 
     def _iso_project(self, x, y, z):
-        """Rzut izometryczny: X w prawo-dol, Y w gore, Z w lewo-gora."""
+        """Rzut izometryczny widgetu: lokalne 'x' w prawo-dol, lokalne
+        'y' w gore (jedyna os obrazu ktora jest czysto pionowa), lokalne
+        'z' w lewo-gora. UWAGA: to sa lokalne osie RYSUNKU, nie osie
+        akcelerometru wprost - patrz komentarz w update()."""
         cos30 = math.cos(math.radians(30))
         sin30 = math.sin(math.radians(30))
         sx = self.cx + (x - z) * cos30
@@ -56,7 +72,7 @@ class AccelVectorWidget:
         return sx, sy
 
     def _draw_floor_grid(self, half_extent_units, step_units, unit_px):
-        """Siatka na plaszczyznie X-Z (Y=0), daje poczucie perspektywy."""
+        """Siatka na plaszczyznie lokalnej x-z (y=0), daje poczucie perspektywy."""
         grid_color = (60, 60, 60)
         n = int(half_extent_units / step_units)
         for i in range(-n, n + 1):
@@ -95,7 +111,9 @@ class AccelVectorWidget:
             origin = self._iso_project(0, 0, 0)
 
             # Osie referencyjne - cienkie i przygaszone, zeby nie
-            # konkurowaly wizualnie z wektorem przyspieszenia
+            # konkurowaly wizualnie z wektorem przyspieszenia.
+            # Lokalna os "y" widgetu (pionowa na ekranie) odpowiada
+            # akcelerometrowi-X (dlugiej osi rakiety) - patrz update().
             x_end = self._iso_project(self.axis_len, 0, 0)
             y_end = self._iso_project(0, self.axis_len, 0)
             z_end = self._iso_project(0, 0, self.axis_len)
@@ -104,6 +122,10 @@ class AccelVectorWidget:
             dpg.draw_arrow(y_end, origin, color=(70, 160, 70), thickness=1, size=6)
             dpg.draw_arrow(z_end, origin, color=(70, 110, 200), thickness=1, size=6)
 
+            # Etykiety: "Y" to zawsze pionowa os widgetu (wysokosc/gora na
+            # ekranie) - konwencja niezalezna od tego, ktory kanal
+            # akcelerometru akurat do niej trafia (patrz update()). "X" to
+            # druga poziomo-skosna os, "Z" trzecia.
             dpg.draw_text((x_end[0] + 4, x_end[1]), "X", color=(220, 100, 100), size=13)
             dpg.draw_text((y_end[0] + 4, y_end[1] - 14), "Y", color=(100, 220, 100), size=13)
             dpg.draw_text((z_end[0] - 14, z_end[1]), "Z", color=(100, 150, 230), size=13)
@@ -134,7 +156,15 @@ class AccelVectorWidget:
             k = 0.0
 
         origin = self._iso_project(0, 0, 0)
-        tip = self._iso_project(ax * k, ay * k, az * k)
+        # Zamiana osi: akcelerometr-X (dluga os rakiety, dziob) trafia na
+        # PIONOWA os widgetu (etykieta "Y" - Y = wysokosc/gora na ekranie,
+        # zawsze), akcelerometr-Y na skosna os "X", akcelerometr-Z zostaje
+        # jako "Z". To odzwierciedla rzeczywisty uklad IMU: gdy rakieta
+        # stoi pionowo na wyrzutni gotowa do lotu, wektor grawitacji jest
+        # prostopadly do ziemi i przechodzi przez os symetrii rakiety, czyli
+        # akcelerometr-X - dlatego to ax musi sterowac pionowa osia widgetu,
+        # a nie ay (mimo ze ta os na ekranie zawsze nazywa sie "Y").
+        tip = self._iso_project(ay * k, ax * k, az * k)
 
         dpg.configure_item(self.vector_tag, p1=origin, p2=tip)
         dpg.configure_item(self.tip_dot_tag, center=tip)

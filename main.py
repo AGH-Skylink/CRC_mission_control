@@ -130,6 +130,19 @@ class MissionControlApp:
         dpg.configure_item("port_combo", items=ports)
         self.logger.info(f"Scanned ports: {ports}")
 
+    def _reset_charts(self):
+        """Czysci wszystkie wykresy (payload temp, altitude/flight, GPS
+        trajektoria) - wywolywane przy kazdym nowym OPEN portu, zeby nowa
+        sesja/lot nie mieszala danych ze starym przebiegiem narysowanym na
+        tych samych osiach."""
+        if self.payload_mgr:
+            self.payload_mgr.reset()
+        if self.flight_mgr:
+            self.flight_mgr.reset()
+        if self.gps_mgr:
+            self.gps_mgr.reset()
+        self._prev_flight_mission_state = None
+
     def _on_connect(self):
         if self.serial.is_running:
             self.serial.disconnect()
@@ -148,6 +161,11 @@ class MissionControlApp:
                 # reconnect w trakcie tej samej sesji aplikacji zostawilby
                 # stary, nieaktualny punkt zerowy z pierwszego polaczenia.
                 self.parser.reset_altitude_baseline()
+                # Kazde nowe OPEN|CLOSE = swiezy start wszystkich wykresow
+                # (temperatura payloadu, wysokosc/lot, trajektoria GPS) -
+                # stare przebiegi z poprzedniej sesji nie powinny zostawac
+                # narysowane razem z nowymi danymi.
+                self._reset_charts()
             else:
                 self.logger.error("Failed to connect!")
 

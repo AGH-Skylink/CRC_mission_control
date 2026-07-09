@@ -161,12 +161,29 @@ class TelemetryParser:
                 self.state.state = new_state
             except ValueError:
                 pass
-
             acc = self.state.accel
-            pitch_rad = math.atan2(-acc.x, math.sqrt(acc.y ** 2 + acc.z ** 2 + 1e-6))
-            roll_rad = math.atan2(acc.y, acc.z + 1e-6)
+            pitch_rad = math.atan2(acc.x, math.sqrt(acc.y ** 2 + acc.z ** 2 + 1e-6))
             self.state.pitch = math.degrees(pitch_rad)
-            self.state.roll = math.degrees(roll_rad)
+
+            ROLL_NO_CONFIDENCE_RAW = 45.0   # ponizej tego roll = szum -> dazy do 0
+            ROLL_FULL_CONFIDENCE_RAW = 90.0  # powyzej tego ufamy odczytowi w 100%
+            ROLL_SMOOTHING = 0.25            # 0..1, wyzej = szybciej reaguje, nizej = gladsze
+
+            horizontal_mag = math.sqrt(acc.y ** 2 + acc.z ** 2)
+            raw_roll_deg = math.degrees(math.atan2(acc.y, acc.z + 1e-6))
+
+            if horizontal_mag <= ROLL_NO_CONFIDENCE_RAW:
+                confidence = 0.0
+            elif horizontal_mag >= ROLL_FULL_CONFIDENCE_RAW:
+                confidence = 1.0
+            else:
+                confidence = (horizontal_mag - ROLL_NO_CONFIDENCE_RAW) / (
+                    ROLL_FULL_CONFIDENCE_RAW - ROLL_NO_CONFIDENCE_RAW
+                )
+
+            target_roll_deg = confidence * raw_roll_deg  # dazy do 0 przy niskiej pewnosci
+            self.state.roll += ROLL_SMOOTHING * (target_roll_deg - self.state.roll)
+
             self.state.yaw = 0.0
 
             self._last_valid_time = time.time()
