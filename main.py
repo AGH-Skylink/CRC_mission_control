@@ -3,9 +3,9 @@ import time
 from core.serial_manager import SerialManager
 from core.telemetry import TelemetryParser
 from core.logger import MissionLogger
-from core.data_types import ConnectionStatus
+from core.data_types import ConnectionStatus, MissionState
 from ui.layout import MissionControlLayout
-from ui.components import StatusIndicator, TerminalComponent, FlightDataDisplays, PayloadManager, GPSManager
+from ui.components import StatusIndicator, TerminalComponent, FlightDataDisplays, PayloadManager, FlightManager, GPSManager
 import ui.theme as theme
 
 
@@ -21,6 +21,8 @@ class MissionControlApp:
         self.layout = MissionControlLayout()
         self.terminal = None
         self.payload_mgr = None
+        self.flight_mgr = None
+        self._prev_flight_mission_state = None  # do wykrywania startu (IDLE -> cokolwiek innego)
 
         self.raw_feed_buffer = []
 
@@ -42,6 +44,7 @@ class MissionControlApp:
         dpg.set_viewport_min_height(700)
         self.layout.create_layout()
         self.payload_mgr = PayloadManager("temp_plot_series")
+        self.flight_mgr = FlightManager("flight_alt_plot_series", accel_widget=self.layout.accel_vector)
 
         self.terminal = TerminalComponent(
             self.layout.terminal_id,
@@ -203,6 +206,22 @@ class MissionControlApp:
 
                     if self.payload_mgr:
                         self.payload_mgr.update(frame.temp, 0.0)
+
+                    if self.flight_mgr:
+                        # Wykres wysokosci ma STALE osie 0-100s / 0-700m
+                        # (patrz ui/layout.py) skalibrowane pod czas TRWANIA
+                        # LOTU, a nie pod czas dzialania aplikacji. Bez tego
+                        # resetu zegar FlightManager liczylby od uruchomienia
+                        # Mission Control (SCAN/CONNECT moga zajac >100s),
+                        # wiec punkty ladowalyby poza widocznym zakresem osi
+                        # X i wykres wygladalby na pusty mimo poprawnych
+                        # danych. Resetujemy zegar w momencie wykrycia startu
+                        # (przejscie z IDLE na dowolny inny stan).
+                        if self._prev_flight_mission_state == MissionState.IDLE and frame.state != MissionState.IDLE:
+                            self.flight_mgr.reset()
+                        self._prev_flight_mission_state = frame.state
+
+                        self.flight_mgr.update(frame.altitude, frame.voltage, frame.state.name, frame.accel)
 
                     self.gps_mgr.update(frame.gps_lat, frame.gps_lon, frame.gps_fix)
 

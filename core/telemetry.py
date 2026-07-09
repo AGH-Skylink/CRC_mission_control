@@ -6,22 +6,41 @@ from typing import Optional
 from core.data_types import TelemetryFrame, MissionState, ConnectionStatus, Vector3
 
 class TelemetryParser:
-    # RAMKA (50 bajtów):
-    # <  - Little Endian
-    # B  - 1x uint8 (preambuła)
-    # I  - 1x uint32 (timestamp)
-    # B, B - 2x uint8 (stan, ost. komenda)
-    # h, h - 2x int16 (wysokość decymetry, temp 1/100 C)
-    # 9h - 9x int16 (3x mag, 3x acc, 3x gyro)
-    # B, B - 2x uint8 (GPS fix, liczba satelit)
-    # 3f - 3x float (GPS lat, lon, alt)
-    # B  - 1x uint8 (GPIO state)
-    # H  - 1x uint16 (napięcie baterii 1/100 V)
-    # B  - 1x uint8 (RSSI)
-    # 3s - 3 bajty zakończenia (\n\r\0)
+    # RAMKA (50 bajtow) - zweryfikowana wprost w kodzie ground station
+    # (AGH-Skylink/CRC-LoRa, branch Pirx, OldAvio/Core/Src/FlightComputer.c).
+    #
+    # UWAGA: to NIE jest jednolita ramka little- ani big-endian. Firmware
+    # pakuje wiekszosc pol RECZNIE (>>24/>>16/>>8/&0xFF), co daje BIG-ENDIAN,
+    # a pola GPS (lat/lon/alt) kopiuje surowym memcpy z natywnej (little-endian)
+    # reprezentacji floata na STM32/ARM. Parsowanie calej ramki jednym
+    # struct.unpack("<...") (jak bylo wczesniej) jest bledne dla wszystkiego
+    # oprocz GPS - stad ramka byla odczytywana zle.
+    #
+    #   0      preambula '$'                          uint8
+    #   1-4    timestamp                       BIG-ENDIAN  uint32
+    #   5      stan                                    uint8
+    #   6      ostatnia komenda                        uint8
+    #   7-8    wysokosc [decymetry]            BIG-ENDIAN  int16
+    #   9-10   temperatura [1/100 C]           BIG-ENDIAN  int16
+    #   11-16  magnetometr x,y,z               BIG-ENDIAN  3x int16
+    #   17-22  akcelerometr x,y,z              BIG-ENDIAN  3x int16
+    #   23-28  zyroskop x,y,z                  BIG-ENDIAN  3x int16
+    #   29     GPS fix quality                         uint8 (firmware wysyla 0xFF gdy fix==1)
+    #   30     GPS liczba satelitow                    uint8
+    #   31-34  GPS lat                       LITTLE-ENDIAN  float32
+    #   35-38  GPS lon                       LITTLE-ENDIAN  float32
+    #   39-42  GPS alt                       LITTLE-ENDIAN  float32
+    #   43     GPIO state (bitfield, patrz data_types.py)  uint8
+    #   44-45  "napiecie baterii"               BIG-ENDIAN  uint16
+    #   46     RSSI                                    uint8
+    #   47-49  zakonczenie \n \r \0                    3x uint8
 
-    FRAME_FORMAT = "< B I B B h h 9h B B 3f B H B 3s"
+    FRAME_FORMAT_PART1 = ">BIBBhh3h3h3hBB"  # bajty 0-30 (31 bajtow), big-endian
+    FRAME_FORMAT_PART2 = "<3f"              # bajty 31-42 (12 bajtow), GPS floats, little-endian
+    FRAME_FORMAT_PART3 = ">BHB3s"           # bajty 43-49 (7 bajtow), big-endian
+
     FRAME_SIZE = 50
+    PREAMBLE = 0x24  # '$'
 
     def __init__(self):
         self.state = TelemetryFrame()
@@ -35,30 +54,70 @@ class TelemetryParser:
         if len(frame_bytes) != self.FRAME_SIZE:
             return None
 
+        if frame_bytes[0] != self.PREAMBLE:
+            # Ramka nie zaczyna sie od '$' - resynchronizacja w SerialManager
+            # powinna temu zapobiegac, ale sprawdzamy defensywnie.
+            self.logger.warning(
+                f"Odrzucono ramke: zla preambula 0x{frame_bytes[0]:02X} (oczekiwano 0x24)"
+            )
+            return None
+
         try:
-            unpacked = struct.unpack(self.FRAME_FORMAT, frame_bytes)
+            (
+                preamble,
+                timestamp,
+                stan_raw,
+                last_command,
+                altitude_raw,
+                temp_raw,
+                mx, my, mz,
+                ax, ay, az,
+                gx, gy, gz,
+                gps_fix,
+                gps_sats,
+            ) = struct.unpack(self.FRAME_FORMAT_PART1, frame_bytes[0:31])
 
-            self.state.timestamp_ms = unpacked[1]
-            stan_raw = unpacked[2]
-            self.state.last_command = unpacked[3]
+            gps_lat, gps_lon, gps_alt = struct.unpack(self.FRAME_FORMAT_PART2, frame_bytes[31:43])
 
-            self.state.altitude = unpacked[4] / 1000.0
-            self.state.temp = unpacked[5] / 1000.0 # 1/100 st.C
+            gpio_state, voltage_raw, rssi_raw, _end = struct.unpack(
+                self.FRAME_FORMAT_PART3, frame_bytes[43:50]
+            )
 
-            self.state.mag = Vector3(unpacked[6], unpacked[7], unpacked[8])
-            self.state.accel = Vector3(unpacked[9], unpacked[10], unpacked[11])
-            self.state.gyro = Vector3(unpacked[12], unpacked[13], unpacked[14])
+            self.state.timestamp_ms = timestamp
+            self.state.last_command = last_command
+
+            self.state.altitude = altitude_raw / 10.0   # decymetry -> metry
+            self.state.temp = temp_raw / 100.0          # 1/100 st.C -> st.C
+
+            self.state.mag = Vector3(mx, my, mz)
+            self.state.accel = Vector3(ax, ay, az)
+            self.state.gyro = Vector3(gx, gy, gz)
 
             # GPS
-            self.state.gps_fix = unpacked[15]
-            self.state.gps_sats = unpacked[16]
-            self.state.gps_lat = unpacked[17]
-            self.state.gps_lon = unpacked[18]
-            self.state.gps_alt = unpacked[19]
+            self.state.gps_fix = gps_fix
+            self.state.gps_sats = gps_sats
+            self.state.gps_lat = gps_lat
+            self.state.gps_lon = gps_lon
+            self.state.gps_alt = gps_alt
 
-            self.state.gpio_state = unpacked[20]
-            self.state.voltage = unpacked[21] / 20000.0
-            self.state.rssi = unpacked[22]
+            self.state.gpio_state = gpio_state
+
+            # UWAGA: aktualny firmware GS (CRC-LoRa) wysyla tu SUROWA wartosc
+            # ADC, nie napiecie w V (w kodzie GS jest komentarz
+            # "dodac funkcje przeliczajaca" - konwersja jeszcze nie istnieje).
+            # Dzielimy przez 100.0 zgodnie z udokumentowanym formatem ramki
+            # (1/100 V), zeby MC bylo gotowe, gdy GS zacznie wysylac juz
+            # przeliczona wartosc. Do tego czasu ta liczba NIE jest realnym
+            # napieciem w woltach.
+            self.state.voltage = voltage_raw / 100.0
+
+            # RSSI: firmware liczy LoRa_getRSSI() = -164 + read (wartosc
+            # ujemna, int), ale zapisuje ja do bajtu przez (uint8_t)cast -
+            # co obcina znak. Odzyskujemy to jako 8-bitowa liczba ze znakiem
+            # (U2). Dla bardzo slabego sygnalu (< -128 dBm) wartosc i tak
+            # bedzie niejednoznaczna z powodu tego bledu w firmware - to nie
+            # da sie naprawic wylacznie po stronie odbiorcy.
+            self.state.rssi = rssi_raw - 256 if rssi_raw >= 128 else rssi_raw
 
             try:
                 new_state = MissionState(stan_raw)

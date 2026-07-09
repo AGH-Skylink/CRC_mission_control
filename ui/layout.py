@@ -1,11 +1,13 @@
 import dearpygui.dearpygui as dpg
 from ui.navball import NavballWidget
+from ui.accel_vector import AccelVectorWidget
 import ui.theme as theme
 
 
 class MissionControlLayout:
     def __init__(self):
         self.navball = None
+        self.accel_vector = None
         self.terminal_id = "telemetry_feed_terminal"
 
     def create_layout(self):
@@ -98,6 +100,49 @@ class MissionControlLayout:
                             y_axis = dpg.add_plot_axis(dpg.mvYAxis, label="Temp (°C)", tag="temp_y_axis")
                             dpg.add_line_series([], [], label="Temp Trend", parent=y_axis, tag="temp_plot_series")
 
+                    # KARTA: FLIGHT (wysokosc w czasie, wektor przyspieszenia 3D,
+                    # napiecie, stan lotu)
+                    with dpg.tab(label="FLIGHT"):
+                        dpg.add_spacer(height=10)
+                        dpg.add_text("FLIGHT OVERVIEW", indent=550, color=theme.ACCENT_PRIMARY)
+
+                        with dpg.group(horizontal=True):
+                            with dpg.child_window(width=260, height=150, border=False):
+                                dpg.add_text("ALTITUDE", color=theme.TEXT_NORMAL)
+                                dpg.add_text("0.0 m", tag="big_flight_alt_val", color=theme.STATUS_AMBER)
+                                dpg.bind_item_font("big_flight_alt_val", "big_payload_font")
+                            with dpg.child_window(width=260, height=150, border=False):
+                                dpg.add_text("BATTERY VOLTAGE", color=theme.TEXT_NORMAL)
+                                dpg.add_text("0.00 V", tag="big_flight_volt_val", color=theme.STATUS_BLUE)
+                                dpg.bind_item_font("big_flight_volt_val", "big_payload_font")
+                            with dpg.child_window(width=260, height=150, border=False):
+                                dpg.add_text("FLIGHT STATE", color=theme.TEXT_NORMAL)
+                                dpg.add_text("IDLE", tag="big_flight_state_val", color=theme.STATUS_GREEN)
+                                dpg.bind_item_font("big_flight_state_val", "big_payload_font")
+
+                        dpg.add_spacer(height=10)
+
+                        with dpg.group(horizontal=True):
+                            # Wykres wysokosci w czasie - STALE osie (nie
+                            # przewijajacy sie jak w PAYLOAD), dopasowane do
+                            # profilu lotu z raportu koncowego (OpenRocket
+                            # sim: apogeum ~533 m, calkowity czas lotu ~91.8 s)
+                            with dpg.child_window(width=-330, height=-1, border=True):
+                                dpg.add_text("ALTITUDE OVER TIME", color=theme.ACCENT_PRIMARY)
+                                with dpg.plot(height=-1, width=-1):
+                                    dpg.add_plot_legend()
+                                    dpg.add_plot_axis(dpg.mvXAxis, label="Time (s)", tag="flight_alt_x_axis")
+                                    dpg.set_axis_limits("flight_alt_x_axis", 0, 100)
+                                    alt_y_axis = dpg.add_plot_axis(dpg.mvYAxis, label="Altitude (m)", tag="flight_alt_y_axis")
+                                    dpg.set_axis_limits(alt_y_axis, 0, 700)
+                                    dpg.add_line_series([], [], label="Altitude", parent=alt_y_axis, tag="flight_alt_plot_series")
+
+                            # Wektor przyspieszenia 3D (rzut izometryczny)
+                            with dpg.child_window(width=320, height=-1, border=True):
+                                dpg.add_text("ACCELERATION VECTOR (3D)", color=theme.ACCENT_PRIMARY)
+                                accel_container = dpg.add_child_window(height=-1, border=False)
+                                self.accel_vector = AccelVectorWidget(accel_container)
+
                     # KARTA: HARDWARE
                     with dpg.tab(label="HARDWARE"):
                         with dpg.child_window(width=-1, height=-1, border=False, horizontal_scrollbar=True):
@@ -148,7 +193,10 @@ class MissionControlLayout:
                                 with dpg.child_window(width=panel_w, height=panel_h, border=True):
                                     dpg.add_text("BREAKAWAY", color=theme.TEXT_NORMAL)
                                     dpg.add_separator()
-                                    dpg.add_text("WIRE: --", tag="hw_breakaway")
+                                    # UWAGA: firmware GS obecnie NIE wysyla stanu zerwania
+                                    # linki w telemetrii (brak tego bitu w ramce) - domyslnie
+                                    # "N/A", zeby nie sugerowac realnego odczytu.
+                                    dpg.add_text("WIRE: N/A", tag="hw_breakaway")
 
                                 # 5. Kontrola mechanizmów (Lotki aerodynamiczne)
                                 with dpg.child_window(width=panel_w, height=panel_h, border=True):
@@ -194,6 +242,8 @@ class MissionControlLayout:
                                     dpg.add_text("LED R: OFF", tag="hw_led_r")
                                     dpg.add_text("LED G: OFF", tag="hw_led_g")
                                     dpg.add_text("LED B: OFF", tag="hw_led_b")
+                                    dpg.add_text("LED Y: OFF", tag="hw_led_y")
+                                    dpg.add_text("CAM: OFF", tag="hw_camera")
 
                                 # # 10. Harmonogram lotu
                                 # with dpg.child_window(width=panel_w + 15, height=panel_h, border=True):

@@ -118,22 +118,29 @@ class FlightDataDisplays:
             dpg.set_value("hw_gps_lon", f"LON: {frame.gps_lon:.4f}")
             dpg.set_value("hw_gps_alt", f"G_ALT: {frame.gps_alt:.1f} m")
 
-            # BREAKAWAY WIRE (Stan pinu GPIO)
-            dpg.set_value("hw_breakaway", f"WIRE: {'OK' if frame.breakaway_wire else 'DISCONNECTED'}")
+            # BREAKAWAY WIRE: firmware GS obecnie nie wysyla tego stanu w
+            # telemetrii (patrz komentarz w data_types.py) - zawsze N/A.
+            dpg.set_value("hw_breakaway", "WIRE: N/A")
 
-            # RECOVERY SYSTEM
+            # RECOVERY SYSTEM (bity led_parachute/led_state z bajtu GPIO)
             dpg.set_value("hw_pyro1", f"PYRO1: {'FIRE' if frame.pyro1 else 'READY'}")
             dpg.set_value("hw_pyro2", f"PYRO2: {'FIRE' if frame.pyro2 else 'READY'}")
 
             # BATTERY & RSSI
-            dpg.set_value("hw_bat_volt", f"VOLT: {frame.voltage:.2f} V")
-            dpg.set_value("hw_rssi", f"RSSI: -{frame.rssi} dBm")
+            # UWAGA: frame.voltage NIE jest jeszcze realnym napieciem - GS
+            # wysyla surowa wartosc ADC (patrz komentarz w telemetry.py).
+            dpg.set_value("hw_bat_volt", f"VOLT: {frame.voltage:.2f} V (raw ADC, niekalibrowane)")
+            # frame.rssi jest juz poprawnie ze znakiem (patrz telemetry.py),
+            # wiec nie doklejamy tu wlasnego minusa.
+            dpg.set_value("hw_rssi", f"RSSI: {frame.rssi} dBm")
 
             # BUZZER & LEDS
             dpg.set_value("hw_buzzer", f"BUZZ: {'ON' if frame.buzzer else 'OFF'}")
             dpg.set_value("hw_led_r", f"LED R: {'ON' if frame.led_r else 'OFF'}")
             dpg.set_value("hw_led_g", f"LED G: {'ON' if frame.led_g else 'OFF'}")
             dpg.set_value("hw_led_b", f"LED B: {'ON' if frame.led_b else 'OFF'}")
+            dpg.set_value("hw_led_y", f"LED Y: {'ON' if frame.led_y else 'OFF'}")
+            dpg.set_value("hw_camera", f"CAM: {'ON' if frame.camera else 'OFF'}")
 
         except Exception:
             pass
@@ -160,6 +167,51 @@ class PayloadManager:
 
         if len(self.times) > 1:
             dpg.set_axis_limits("temp_x_axis", self.times[0], self.times[-1])
+            # Y-axis (temperatura) - dpg nie zawsze auto-dopasowuje zakres
+            # domyslnie, wiec robimy to jawnie (inaczej wykres potrafi
+            # utknac na domyslnym zakresie 0-1 i linia nie jest widoczna).
+            dpg.set_axis_limits_auto("temp_y_axis")
+            dpg.fit_axis_data("temp_y_axis")
+
+
+class FlightManager:
+    """Analogiczny do PayloadManager, ale dla zakladki FLIGHT: wykres
+    wysokosci w czasie + napiecie/stan lotu (tekst) + wektor przyspieszenia
+    3D (delegowany do AccelVectorWidget).
+
+    W odroznieniu od PayloadManager, ten wykres ma STALE osie (0-100s,
+    0-700m - dobrane wg symulacji OpenRocket z raportu koncowego: apogeum
+    ~533m, calkowity czas lotu ~91.8s) i sie nie przewija - caly przebieg
+    lotu jest widoczny na raz, zamiast "jezdzacego" okna czasowego."""
+
+    def __init__(self, plot_tag, accel_widget=None, max_points=5000):
+        self.plot_tag = plot_tag
+        self.accel_widget = accel_widget
+        self.times = deque(maxlen=max_points)
+        self.altitudes = deque(maxlen=max_points)
+        self.start_time = time.time()
+
+    def reset(self):
+        """Wyczysc wykres i wznow liczenie czasu od 0 - wywolaj np. przy
+        przejsciu do stanu WAITING/nowego startu."""
+        self.times.clear()
+        self.altitudes.clear()
+        self.start_time = time.time()
+        dpg.set_value(self.plot_tag, [[], []])
+
+    def update(self, altitude, voltage, state_name, accel):
+        elapsed = time.time() - self.start_time
+        self.times.append(elapsed)
+        self.altitudes.append(altitude)
+
+        dpg.set_value(self.plot_tag, [list(self.times), list(self.altitudes)])
+
+        dpg.set_value("big_flight_alt_val", f"{altitude:.1f} m")
+        dpg.set_value("big_flight_volt_val", f"{voltage:.2f} V")
+        dpg.set_value("big_flight_state_val", f"{state_name}")
+
+        if self.accel_widget:
+            self.accel_widget.update(accel.x, accel.y, accel.z)
 
 
 class GPSManager:
