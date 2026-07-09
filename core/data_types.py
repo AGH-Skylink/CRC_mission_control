@@ -33,7 +33,8 @@ class TelemetryFrame:
     state: MissionState = MissionState.IDLE
     last_command: int = 0
 
-    altitude: float = 0.0
+    altitude: float = 0.0       # przyblizona wysokosc n.p.m. (patrz telemetry.py: LAUNCH_SITE_ELEVATION_M + delta)
+    altitude_agl: float = 0.0   # surowa delta wzgledem pierwszego odczytu barometru (above launch point)
     temp: float = 0.0
 
     accel: Vector3 = field(default_factory=Vector3)

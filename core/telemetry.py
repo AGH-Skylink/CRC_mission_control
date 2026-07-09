@@ -42,6 +42,19 @@ class TelemetryParser:
     FRAME_SIZE = 50
     PREAMBLE = 0x24  # '$'
 
+    # Wysokosc w ramce jest liczona przez firmware wzgledem cisnienia
+    # referencyjnego skalibrowanego PRZY WLACZENIU urzadzenia na ziemi
+    # (patrz FlightComputer.c: pressure_reference), a NIE wzgledem poziomu
+    # morza. Dlatego surowa wartosc z ramki potrafi wyjsc np. -72 m - to
+    # normalne, po prostu to inny punkt odniesienia (0 = miejsce/wysokosc
+    # kalibracji barometru w firmware).
+    #
+    # Zeby wyswietlac wysokosc zaczynajaca sie od 0 przy kazdym podlaczeniu,
+    # zakotwiczamy PIERWSZY odebrany odczyt jako nowe 0 m i do wszystkich
+    # kolejnych ramek doliczamy tylko DELTE zmiany wysokosci wzgledem tego
+    # pierwszego odczytu (kszalt krzywej lotu zostaje dokladnie taki jak z
+    # barometru, tylko przesuniety tak, ze start = 0).
+
     def __init__(self):
         self.state = TelemetryFrame()
         self._last_valid_time = 0.0
@@ -49,6 +62,15 @@ class TelemetryParser:
         self._prev_mission_state = MissionState.IDLE
         self._prev_conn_status = ConnectionStatus.DISCONNECTED
         self._last_drop_time = 0
+        self._altitude_baseline_raw = None  # ustawiane na 1. odebranej ramce
+
+    def reset_altitude_baseline(self):
+        """Wyzeruj punkt odniesienia wysokosci - kolejna odebrana ramka
+        stanie sie nowym '0 m'. Wywolywane automatycznie przy kazdym
+        otwarciu portu (main.py: _on_connect), zeby pierwsza ramka nowej
+        sesji zawsze startowala od 0, a nie od starego punktu zerowego z
+        poprzedniego polaczenia."""
+        self._altitude_baseline_raw = None
 
     def parse_frame(self, frame_bytes: bytes) -> Optional[TelemetryFrame]:
         if len(frame_bytes) != self.FRAME_SIZE:
@@ -86,7 +108,19 @@ class TelemetryParser:
             self.state.timestamp_ms = timestamp
             self.state.last_command = last_command
 
-            self.state.altitude = altitude_raw / 10.0   # decymetry -> metry
+            altitude_relative_m = altitude_raw / 10.0   # decymetry -> metry (wzgledem kalibracji GS)
+
+            if self._altitude_baseline_raw is None:
+                self._altitude_baseline_raw = altitude_relative_m
+
+            # Wysokosc wzgledna: pierwsza odebrana ramka (po polaczeniu /
+            # reset_altitude_baseline()) = 0 m, kazda kolejna to delta
+            # zmiany wzgledem niej.
+            self.state.altitude = altitude_relative_m - self._altitude_baseline_raw
+            # Alias - to samo co altitude, zostawione dla przejrzystosci
+            # kodu/logow (above ground/launch point).
+            self.state.altitude_agl = self.state.altitude
+
             self.state.temp = temp_raw / 100.0          # 1/100 st.C -> st.C
 
             self.state.mag = Vector3(mx, my, mz)

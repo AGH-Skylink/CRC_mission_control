@@ -4,6 +4,7 @@ from core.serial_manager import SerialManager
 from core.telemetry import TelemetryParser
 from core.logger import MissionLogger
 from core.data_types import ConnectionStatus, MissionState
+from core.commands import resolve_command_code
 from ui.layout import MissionControlLayout
 from ui.components import StatusIndicator, TerminalComponent, FlightDataDisplays, PayloadManager, FlightManager, GPSManager
 import ui.theme as theme
@@ -128,6 +129,13 @@ class MissionControlApp:
 
             if port and self.serial.connect(port, baudrate):
                 self.logger.info(f"Connected to {port} at {baudrate} bps")
+                # Nowe otwarcie portu = nowa sesja odczytow barometru.
+                # Zerujemy baseline wysokosci, zeby PIERWSZA ramka odebrana
+                # po tym polaczeniu (a nie jakas stara z poprzedniej sesji)
+                # stala sie nowym punktem odniesienia "0 m". Bez tego
+                # reconnect w trakcie tej samej sesji aplikacji zostawilby
+                # stary, nieaktualny punkt zerowy z pierwszego polaczenia.
+                self.parser.reset_altitude_baseline()
             else:
                 self.logger.error("Failed to connect!")
 
@@ -141,12 +149,23 @@ class MissionControlApp:
         dpg.focus_item("cmd_input")
 
     def _send_cmd(self, cmd):
-        if self.serial.send_data(cmd):
+        # Firmware GS (FlightComputer_handleCommand) czyta DOKLADNIE 1
+        # surowy bajt (LoRa_receive(...,1)), nie tekst - wiec tlumaczymy
+        # nazwe komendy na jej kod (patrz core/commands.py, zgodny 1:1 ze
+        # switchem w FlightComputer.c) i wysylamy pojedynczy bajt.
+        code, warning = resolve_command_code(cmd)
+
+        if code is None:
+            self.logger.error(f"Komenda odrzucona: {warning}")
+            self.terminal_cmd.append(f"!! {warning}")
+            return False
+
+        if self.serial.send_command_byte(code):
             StatusIndicator.set_led("tx_led", theme.STATUS_BLUE)
             self.tx_timer = time.time() + 0.1
 
-            self.logger.info(f"Sent: {cmd}")
-            self.terminal_cmd.append(f"TX > {cmd}")
+            self.logger.info(f"Sent: {cmd} -> bajt {code} (0x{code:02X})")
+            self.terminal_cmd.append(f"TX > {cmd}  [bajt: {code} / 0x{code:02X}]")
             return True
         return False
 
