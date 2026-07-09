@@ -58,12 +58,7 @@ class TelemetryFrame:
     last_update: float = field(default_factory=lambda: 0.0)
     dropped_frames: int = 0
 
-    # Bity GPIO (bajt 43 ramki) - zweryfikowane wprost w kodzie ground
-    # station (AGH-Skylink/CRC-LoRa, branch Pirx, FlightComputer.c,
-    # sekcja "GPIO STATUS"). Poprzednia wersja mapowala te bity zupelnie
-    # inaczej (pyro1/pyro2/led_r/led_g/led_b/buzzer/camera/breakaway_wire
-    # kolejno od bitu 0) - nie odpowiadalo to temu, co faktycznie wysyla
-    # firmware. Prawdziwa kolejnosc (MSB -> LSB):
+    # kolejnosc (MSB -> LSB):
     #   bit7: led_parachute, bit6: led_state, bit5: led_r, bit4: led_g,
     #   bit3: led_b, bit2: led_y, bit1: buzzer, bit0: camera
 
@@ -91,10 +86,6 @@ class TelemetryFrame:
     @property
     def camera(self) -> bool: return bool(self.gpio_state & (1 << 0))
 
-    # Aliasy zachowane dla wstecznej kompatybilnosci z UI, ktore uzywalo
-    # nazw pyro1/pyro2 - w firmware te piny nazywaja sie led_parachute i
-    # led_state, wiec podpinamy je pod prawidlowe bity zamiast (blednych)
-    # bitow 0 i 1.
     @property
     def pyro1(self) -> bool: return self.led_parachute
 
@@ -103,11 +94,4 @@ class TelemetryFrame:
 
     @property
     def breakaway_wire(self) -> bool:
-        # UWAGA: firmware GS SLEDZI stan zerwania linki (breakaway_wire_detached)
-        # wewnetrznie, ale NIE wysyla go obecnie w ramce telemetrii (nie ma go
-        # w bajcie GPIO ani nigdzie indziej w telemetry_frame). Poprzednia
-        # wersja czytala to z bitu 7 gpio_state, co w rzeczywistosci jest
-        # bitem led_parachute - dawalo to fikcyjne/losowe wskazanie. Dopoki
-        # firmware nie zacznie tego faktycznie wysylac, zwracamy zawsze
-        # False (i UI powinno to oznaczac jako "N/A", nie jako realny odczyt).
         return False

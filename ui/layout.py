@@ -14,7 +14,6 @@ class MissionControlLayout:
         # Główny kontener Viewportu - wyłączamy scrollbar dla całego okna
         with dpg.window(tag="Primary Window", no_title_bar=True, no_move=True,
                         no_resize=True, no_scrollbar=True):
-            # --- 1. TOP BAR (Stała wysokość: 60px) ---
             with dpg.child_window(height=60, border=False, no_scrollbar=True):
                 with dpg.group(horizontal=True):
                     dpg.add_text("0.0 kb/s", tag="bitrate_text", color=theme.ACCENT_PRIMARY)
@@ -39,16 +38,11 @@ class MissionControlLayout:
 
             dpg.add_separator()
 
-            # --- 2. ŚRODKOWY OBSZAR ROBOCZY (Dynamiczna wysokość) ---
             with dpg.child_window(height=-110, border=False, tag="main_content_area"):
                 with dpg.tab_bar():
-                    # KARTA: COMMUNICATION
-                    # ui/layout.py - Fragment zakładki COMMUNICATION
                     with dpg.tab(label="COMMUNICATION"):
                         with dpg.group(horizontal=True):
-                            # Lewa kolumna: Terminale
                             with dpg.child_window(width=-400, border=True):
-                                # RAW TELEMETRY FEED
                                 with dpg.group(horizontal=True):
                                     dpg.add_text("TELEMETRY FEED (RAW)", color=theme.ACCENT_PRIMARY)
                                     dpg.add_spacer(width=20)
@@ -61,7 +55,6 @@ class MissionControlLayout:
                                 dpg.add_spacer(height=10)
                                 dpg.add_separator()
 
-                                # COMMAND CONSOLE
                                 with dpg.group(horizontal=True):
                                     dpg.add_text("COMMAND CONSOLE", color=theme.STATUS_BLUE)
                                     dpg.add_spacer(width=35)
@@ -71,7 +64,6 @@ class MissionControlLayout:
                                 with dpg.child_window(height=-1, border=True, tag="command_console_container"):
                                     dpg.add_text("", tag="command_console")
 
-                            # Prawa kolumna: Navball i Wskaźniki
                             with dpg.child_window(width=380, border=True):
                                 nav_container = dpg.add_child_window(height=350, border=False)
                                 self.navball = NavballWidget(nav_container)
@@ -81,7 +73,6 @@ class MissionControlLayout:
                                 dpg.add_text("PAYLOAD TEMP: 0.0 °C", tag="temp_display")
                                 dpg.add_text("VOLTAGE: 0.0 V", tag="volt_display")
 
-                    # KARTA: PAYLOAD
                     with dpg.tab(label="PAYLOAD"):
                         dpg.add_spacer(height=10)
                         dpg.add_text("ALGAE BIOLOGICAL PAYLOAD MONITOR", indent=550, color=theme.ACCENT_PRIMARY)
@@ -100,8 +91,6 @@ class MissionControlLayout:
                             y_axis = dpg.add_plot_axis(dpg.mvYAxis, label="Temp (°C)", tag="temp_y_axis")
                             dpg.add_line_series([], [], label="Temp Trend", parent=y_axis, tag="temp_plot_series")
 
-                    # KARTA: FLIGHT (wysokosc w czasie, wektor przyspieszenia 3D,
-                    # napiecie, stan lotu)
                     with dpg.tab(label="FLIGHT"):
                         dpg.add_spacer(height=10)
                         dpg.add_text("FLIGHT OVERVIEW", indent=550, color=theme.ACCENT_PRIMARY)
@@ -120,10 +109,6 @@ class MissionControlLayout:
                                 dpg.add_text("IDLE", tag="big_flight_state_val", color=theme.STATUS_GREEN)
                                 dpg.bind_item_font("big_flight_state_val", "big_payload_font")
 
-                            # Szybkie komendy do LoRa - te same kody co w
-                            # core/commands.py (COMMAND_CODES), 1:1 ze
-                            # switchem w FlightComputer_handleCommand w
-                            # firmware GS. Cyfra w nawiasie = wysylany bajt.
                             with dpg.child_window(width=-1, height=150, border=True, no_scrollbar=True):
                                 dpg.add_text("QUICK COMMANDS (LoRa)", color=theme.ACCENT_PRIMARY)
                                 with dpg.group(horizontal=True):
@@ -141,8 +126,6 @@ class MissionControlLayout:
                                     color=theme.TEXT_NORMAL,
                                 )
 
-                                # Delikatne kolorowanie semantyczne najwazniejszych
-                                # szybkich komend (tylko styl, bez zmiany zawartosci/tagow)
                                 teal_q_theme = theme.create_button_theme(theme.COLOR_TEAL)
                                 red_q_theme = theme.create_button_theme(theme.STATUS_RED)
                                 amber_q_theme = theme.create_button_theme(theme.STATUS_AMBER)
@@ -155,10 +138,6 @@ class MissionControlLayout:
                         dpg.add_spacer(height=10)
 
                         with dpg.group(horizontal=True):
-                            # Wykres wysokosci w czasie - STALE osie (nie
-                            # przewijajacy sie jak w PAYLOAD), dopasowane do
-                            # profilu lotu z raportu koncowego (OpenRocket
-                            # sim: apogeum ~533 m, calkowity czas lotu ~91.8 s)
                             with dpg.child_window(width=-330, height=-1, border=True):
                                 dpg.add_text("ALTITUDE OVER TIME", color=theme.ACCENT_PRIMARY)
                                 with dpg.plot(height=-1, width=-1):
@@ -169,13 +148,11 @@ class MissionControlLayout:
                                     dpg.set_axis_limits(alt_y_axis, 0, 700)
                                     dpg.add_line_series([], [], label="Altitude", parent=alt_y_axis, tag="flight_alt_plot_series")
 
-                            # Wektor przyspieszenia 3D (rzut izometryczny)
                             with dpg.child_window(width=320, height=-1, border=True):
                                 dpg.add_text("ACCELERATION VECTOR (3D)", color=theme.ACCENT_PRIMARY)
                                 accel_container = dpg.add_child_window(height=-1, border=False)
                                 self.accel_vector = AccelVectorWidget(accel_container)
 
-                    # KARTA: HARDWARE
                     with dpg.tab(label="HARDWARE"):
                         with dpg.child_window(width=-1, height=-1, border=False, horizontal_scrollbar=True):
                             with dpg.group(horizontal=True):
@@ -188,7 +165,6 @@ class MissionControlLayout:
                             with dpg.group(horizontal=True):
                                 panel_w, panel_h = 125, 230
 
-                                # 1. Panel IMU (Akcelerometr i Żyroskop)
                                 with dpg.child_window(width=panel_w, height=panel_h, border=True):
                                     dpg.add_text("IMU_MPU9250", color=theme.TEXT_NORMAL)
                                     dpg.add_separator()
@@ -204,14 +180,12 @@ class MissionControlLayout:
                                     dpg.add_text("MAG Y: --", tag="hw_mag_y")
                                     dpg.add_text("MAG Z: --", tag="hw_mag_z")
 
-                                # 2. Panel Barometru
                                 with dpg.child_window(width=panel_w, height=panel_h, border=True):
                                     dpg.add_text("BARO_BMP280", color=theme.TEXT_NORMAL)
                                     dpg.add_separator()
                                     dpg.add_text("ALT: -- m", tag="hw_baro_alt")
                                     dpg.add_text("TEMP: -- °C", tag="hw_baro_temp")
 
-                                # 3. Panel GPS
                                 with dpg.child_window(width=panel_w + 15, height=panel_h, border=True):
                                     dpg.add_text("GPS_GP02", color=theme.TEXT_NORMAL)
                                     dpg.add_separator()
@@ -221,16 +195,11 @@ class MissionControlLayout:
                                     dpg.add_text("LON: --", tag="hw_gps_lon")
                                     dpg.add_text("G_ALT: -- m", tag="hw_gps_alt")
 
-                                # 4. Zastąpiony panel BODY_STRESS -> BREAKAWAY WIRE
                                 with dpg.child_window(width=panel_w, height=panel_h, border=True):
                                     dpg.add_text("BREAKAWAY", color=theme.TEXT_NORMAL)
                                     dpg.add_separator()
-                                    # UWAGA: firmware GS obecnie NIE wysyla stanu zerwania
-                                    # linki w telemetrii (brak tego bitu w ramce) - domyslnie
-                                    # "N/A", zeby nie sugerowac realnego odczytu.
                                     dpg.add_text("WIRE: N/A", tag="hw_breakaway")
 
-                                # 5. Kontrola mechanizmów (Lotki aerodynamiczne)
                                 with dpg.child_window(width=panel_w, height=panel_h, border=True):
                                     dpg.add_text("AERO_FINS", color=theme.TEXT_NORMAL)
                                     dpg.add_spacer(height=10)
@@ -241,7 +210,6 @@ class MissionControlLayout:
                                     dpg.add_button(label="OPEN", width=-1)
                                     dpg.add_button(label="CLOSE", width=-1)
 
-                                # 6. System Odzyskiwania (Spadochrony)
                                 with dpg.child_window(width=panel_w, height=panel_h, border=True):
                                     dpg.add_text("RECOVERY_SYS", color=theme.TEXT_NORMAL)
                                     dpg.add_separator()
@@ -251,14 +219,12 @@ class MissionControlLayout:
                                     dpg.add_button(label="ARM", width=-1)
                                     dpg.add_button(label="DISARM", width=-1)
 
-                                # 7. Zasilanie i parametry sygnału radiowego
                                 with dpg.child_window(width=panel_w, height=panel_h, border=True):
                                     dpg.add_text("BATTERY", color=theme.TEXT_NORMAL)
                                     dpg.add_separator()
                                     dpg.add_text("VOLT: -- V", tag="hw_bat_volt")
                                     dpg.add_text("RSSI: -- dBm", tag="hw_rssi")
 
-                                # 8. Karta SD Loggera pokładowego
                                 with dpg.child_window(width=panel_w, height=panel_h, border=True):
                                     dpg.add_text("SD_LOGGER", color=theme.TEXT_NORMAL)
                                     dpg.add_spacer(height=25)

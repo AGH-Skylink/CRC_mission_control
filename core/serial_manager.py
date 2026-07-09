@@ -107,12 +107,6 @@ class SerialManager:
             self._last_stat_time = now
 
     def send_data(self, data):
-        """Wysyla `data` jako tekst ASCII + '\\n'. UWAGA: firmware GS
-        (FlightComputer_handleCommand) NIE parsuje tekstu - odczytuje
-        dokladnie 1 surowy bajt przez LoRa_receive(..., 1). Ta metoda
-        zostaje dla ogolnego, nieinterpretowanego ruchu na porcie
-        (np. debug/inne urzadzenia), ale do wysylania komend rakiety
-        UZYWAJ send_command_byte() ponizej."""
         if self.ser and self.ser.is_open:
             try:
                 self.ser.write(f"{data}\n".encode())
@@ -124,10 +118,6 @@ class SerialManager:
         return False
 
     def send_command_byte(self, code: int) -> bool:
-        """Wysyla POJEDYNCZY surowy bajt - dokladnie to, czego oczekuje
-        FlightComputer_handleCommand() w firmware GS (LoRa_receive(...,1)).
-        Zadnego tekstu, zadnego '\\n' - jeden bajt 0-255 i koniec.
-        Patrz core/commands.py po mapowanie nazw komend na kody."""
         if not (0 <= code <= 255):
             self.logger.error(f"Niepoprawny kod komendy: {code} (musi byc 0-255)")
             return False
