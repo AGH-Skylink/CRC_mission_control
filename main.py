@@ -100,6 +100,18 @@ class MissionControlApp:
 
         dpg.configure_item("deploy_btn", callback=lambda: self._send_cmd("DEPLOY_CHUTE"))
 
+        # Szybkie komendy w zakladce FLIGHT - te same nazwy/kody co przyciski
+        # w zakladce COMMUNICATION, tylko zdublowane tam gdzie wygodniej je
+        # miec pod reka podczas obserwowania telemetrii lotu.
+        dpg.configure_item("flight_cmd_arm_btn", callback=lambda: self._send_cmd("ARM"))
+        dpg.configure_item("flight_cmd_disarm_btn", callback=lambda: self._send_cmd("DISARM"))
+        dpg.configure_item("flight_cmd_reset_btn", callback=lambda: self._send_cmd("RESET"))
+        dpg.configure_item("flight_cmd_abort_btn", callback=lambda: self._send_cmd("ABORT"))
+        dpg.configure_item("flight_cmd_camera_on_btn", callback=lambda: self._send_cmd("CAMERA_ON"))
+        dpg.configure_item("flight_cmd_camera_off_btn", callback=lambda: self._send_cmd("CAMERA_OFF"))
+        dpg.configure_item("flight_cmd_deploy_btn", callback=lambda: self._send_cmd("DEPLOY_CHUTE"))
+        dpg.configure_item("flight_cmd_launch_btn", callback=lambda: self._send_cmd("LAUNCH"))
+
         # dpg.configure_item("sched_start_btn", callback=lambda: self._send_cmd("START_SEQ"))
         # dpg.configure_item("sched_clear_btn", callback=lambda: self._send_cmd("CLEAR_SEQ"))
 

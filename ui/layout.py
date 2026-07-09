@@ -120,6 +120,27 @@ class MissionControlLayout:
                                 dpg.add_text("IDLE", tag="big_flight_state_val", color=theme.STATUS_GREEN)
                                 dpg.bind_item_font("big_flight_state_val", "big_payload_font")
 
+                            # Szybkie komendy do LoRa - te same kody co w
+                            # core/commands.py (COMMAND_CODES), 1:1 ze
+                            # switchem w FlightComputer_handleCommand w
+                            # firmware GS. Cyfra w nawiasie = wysylany bajt.
+                            with dpg.child_window(width=-1, height=150, border=True):
+                                dpg.add_text("QUICK COMMANDS (LoRa)", color=theme.ACCENT_PRIMARY)
+                                with dpg.group(horizontal=True):
+                                    dpg.add_button(label="ARM (1)", width=110, tag="flight_cmd_arm_btn")
+                                    dpg.add_button(label="DISARM (2)", width=110, tag="flight_cmd_disarm_btn")
+                                    dpg.add_button(label="RESET (3)", width=110, tag="flight_cmd_reset_btn")
+                                    dpg.add_button(label="ABORT (4)", width=110, tag="flight_cmd_abort_btn")
+                                with dpg.group(horizontal=True):
+                                    dpg.add_button(label="CAMERA ON (5)", width=110, tag="flight_cmd_camera_on_btn")
+                                    dpg.add_button(label="CAMERA OFF (6)", width=110, tag="flight_cmd_camera_off_btn")
+                                    dpg.add_button(label="DEPLOY CHUTE (7)", width=110, tag="flight_cmd_deploy_btn")
+                                    dpg.add_button(label="LAUNCH (8)", width=110, tag="flight_cmd_launch_btn")
+                                dpg.add_text(
+                                    "3/4/8 sa zarezerwowane w firmware (jeszcze no-op)",
+                                    color=theme.TEXT_NORMAL,
+                                )
+
                         dpg.add_spacer(height=10)
 
                         with dpg.group(horizontal=True):
