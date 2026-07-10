@@ -42,6 +42,15 @@ class SerialManager:
                 if p not in ports:
                     ports.append(p)
 
+        if sys.platform.startswith('linux'):
+            # socat na Linuksie tworzy pary w /dev/pts/N (Unix98 pty), a nie
+            # /dev/ttysXXX jak na macOS - pyserial ich nie widzi w comports(),
+            # bo to nie sa prawdziwe urzadzenia USB/sysfs.
+            virtual_ptys = glob.glob('/dev/pts/[0-9]*')
+            for p in virtual_ptys:
+                if p not in ports:
+                    ports.append(p)
+
         self.logger.info(f"Scanned ports: {ports}")
         return ports
 
