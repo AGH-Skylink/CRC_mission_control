@@ -2,6 +2,7 @@ import dearpygui.dearpygui as dpg
 import time
 from core.serial_manager import SerialManager
 from core.telemetry import TelemetryParser
+from core.csv_sensor_feed import CsvSensorFeed
 from core.logger import MissionLogger
 from core.data_types import ConnectionStatus, MissionState
 from core.commands import resolve_command_code
@@ -9,11 +10,17 @@ from ui.layout import MissionControlLayout
 from ui.components import StatusIndicator, TerminalComponent, FlightDataDisplays, PayloadManager, FlightManager, GPSManager
 import ui.theme as theme
 
+# Sciezka do CSV z nagranymi/przygotowanymi danymi sensorow. Dopoki plik nie
+# istnieje albo jest None, CsvSensorFeed.overlay() jest no-opem i wszystko
+# dziala tak jak dotychczas (real awionika / test/simulator.py bez zmian).
+CSV_SENSOR_PATH = "data/ground_test_sensors.csv"
+
 
 class MissionControlApp:
     def __init__(self):
         self.serial = SerialManager()
         self.parser = TelemetryParser()
+        self.csv_feed = CsvSensorFeed(CSV_SENSOR_PATH)
         self.logger = MissionLogger()
         self.gps_mgr = GPSManager()
         self.tx_timer = 0.0
@@ -221,6 +228,11 @@ class MissionControlApp:
 
                 self.logger.log_raw_frame(raw_hex)
                 self.terminal_raw.append(f"RX > {raw_hex}")
+
+                # Podmiana pol sensorowych wartosciami z CSV (jesli wczytany) -
+                # dzieje sie PO odebraniu ramki, PRZED jej sparsowaniem, wiec
+                # reszta pipeline'u (parser -> UI -> logger) jest nietknieta.
+                raw_bytes = self.csv_feed.overlay(raw_bytes)
 
                 frame = self.parser.parse_frame(raw_bytes)
                 if frame:

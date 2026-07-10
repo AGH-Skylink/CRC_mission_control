@@ -247,5 +247,5 @@ class RocketSimulator:
 
 
 if __name__ == "__main__":
-    sim = RocketSimulator(port='/dev/ttys001')
+    sim = RocketSimulator(port='/dev/ttys004')
     sim.run()
